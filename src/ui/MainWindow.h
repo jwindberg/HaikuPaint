@@ -61,6 +61,7 @@ private:
 			ToolPalette*		fToolPalette;
 			LineWidthPalette*	fLineWidthPalette;
 			PatternPalette*		fPatternPalette;
+			BMenuItem*			fRevertItem;
 			BMenuItem*			fUndoItem;
 			BMenuItem*			fPasteItem;
 			std::vector<BMenuItem*> fSelectionItems;	// need a selection
@@ -91,6 +92,7 @@ private:
 
 			PendingAction		fPendingAction;
 			entry_ref			fPendingRef;
+			BMessage*			fPrintSettings;	// the page setup, once made
 };
 
 

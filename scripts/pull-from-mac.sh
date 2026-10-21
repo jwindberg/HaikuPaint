@@ -22,6 +22,8 @@ rsync -rlpz --checksum \
 	--exclude 'objects.*/' \
 	--exclude 'reference/' \
 	--exclude 'tests/test_canvas' \
+	--exclude 'package-stage/' \
+	--exclude '*.hpkg' \
 	"$MAC_HOST:$MAC_DIR/" "$LOCAL_DIR/"
 
 cd "$LOCAL_DIR"

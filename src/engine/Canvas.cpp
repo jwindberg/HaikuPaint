@@ -20,7 +20,8 @@ Canvas::Canvas(int width, int height)
 	:
 	fWidth(width),
 	fHeight(height),
-	fPixels(size_t(width) * height, 0)
+	fPixels(size_t(width) * height, 0),
+	fMode(PaintMode::Copy)
 {
 }
 
@@ -100,7 +101,7 @@ Canvas::FillRect(int x0, int y0, int x1, int y1, const Pattern& pattern)
 
 	for (int y = top; y <= bottom; y++) {
 		for (int x = left; x <= right; x++)
-			fPixels[_Index(x, y)] = pattern.Bit(x, y) ? 1 : 0;
+			_Paint(_Index(x, y), pattern.Bit(x, y));
 	}
 }
 
@@ -195,7 +196,7 @@ Canvas::FillShape(Shape shape, const Rect& rect, const Pattern& pattern)
 	for (int y = clip.top; y < clip.bottom; y++) {
 		for (int x = clip.left; x < clip.right; x++) {
 			if (InsideShape(shape, rect, kRoundRectCorner, x, y))
-				fPixels[_Index(x, y)] = pattern.Bit(x, y) ? 1 : 0;
+				_Paint(_Index(x, y), pattern.Bit(x, y));
 		}
 	}
 }
@@ -214,7 +215,7 @@ Canvas::FrameShape(Shape shape, const Rect& rect, int penSize,
 		for (int x = clip.left; x < clip.right; x++) {
 			if (InsideShape(shape, rect, kRoundRectCorner, x, y)
 				&& !InsideShape(shape, inner, innerCorner, x, y))
-				fPixels[_Index(x, y)] = pattern.Bit(x, y) ? 1 : 0;
+				_Paint(_Index(x, y), pattern.Bit(x, y));
 		}
 	}
 }
@@ -256,7 +257,7 @@ Canvas::FillPolygon(const std::vector<Point>& points, const Pattern& pattern)
 			int to = std::min(fWidth,
 				(int)std::ceil(crossings[i + 1] - 0.5));
 			for (int x = from; x < to; x++)
-				fPixels[_Index(x, y)] = pattern.Bit(x, y) ? 1 : 0;
+				_Paint(_Index(x, y), pattern.Bit(x, y));
 		}
 	}
 }
@@ -294,8 +295,8 @@ Canvas::StampMask(const Mask16& mask, int centerX, int centerY,
 	for (int y = 0; y < 16; y++) {
 		for (int x = 0; x < 16; x++) {
 			if (mask.Bit(x, y) && Contains(left + x, top + y)) {
-				fPixels[_Index(left + x, top + y)]
-					= pattern.Bit(left + x, top + y) ? 1 : 0;
+				_Paint(_Index(left + x, top + y),
+					pattern.Bit(left + x, top + y));
 			}
 		}
 	}

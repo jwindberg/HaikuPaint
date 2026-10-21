@@ -4,7 +4,9 @@
 #include <Cursor.h>
 
 #include <algorithm>
+#include <vector>
 
+#include "Dither.h"
 #include "PaintFont.h"
 
 
@@ -41,20 +43,22 @@ CanvasFromBitmap(const BBitmap* source, hp::Canvas& canvas)
 	if (status != B_OK)
 		return status;
 
-	canvas.Clear();
+	// Only the part that fits matters.
 	int width = std::min((int)source->Bounds().Width() + 1, canvas.Width());
 	int height = std::min((int)source->Bounds().Height() + 1,
 		canvas.Height());
+	std::vector<uint8_t> gray((size_t)width * height);
 	const uint8* bits = (const uint8*)rgba.Bits();
 	for (int y = 0; y < height; y++) {
 		const uint8* pixel = bits + y * rgba.BytesPerRow();
 		for (int x = 0; x < width; x++, pixel += 4) {
-			// B_RGBA32 is B, G, R, A in memory.
+			// B_RGBA32 is B, G, R, A in memory. Transparent counts as white.
 			int luminance = (114 * pixel[0] + 587 * pixel[1]
 				+ 299 * pixel[2]) / 1000;
-			canvas.Set(x, y, pixel[3] >= 128 && luminance < 128);
+			gray[(size_t)y * width + x] = pixel[3] >= 128 ? luminance : 255;
 		}
 	}
+	hp::DitherGray(gray, width, height, canvas);
 	return B_OK;
 }
 
@@ -114,6 +118,48 @@ DrawPaletteBox(hp::Canvas& canvas)
 	PaintQDRect(canvas, 1, 1, right + 1, bottom + 1);
 	PaintQDRect(canvas, 0, 0, right, bottom, hp::kWhitePattern);
 	FrameQDRect(canvas, 0, 0, right, bottom);
+}
+
+
+static bool
+MacIconBit(const uint8_t* data, int x, int y)
+{
+	return (data[y * 4 + x / 8] >> (7 - x % 8)) & 1;
+}
+
+
+BBitmap*
+NewMacIconBitmap(const uint8_t* image, const uint8_t* mask, int size)
+{
+	// The classic palette's black, white and transparent.
+	const uint8 kBlack = 0x00;
+	const uint8 kWhite = 0x3f;
+
+	int scale = 32 / size;
+	BBitmap* bitmap = new BBitmap(BRect(0, 0, size - 1, size - 1),
+		B_CMAP8);
+	uint8* bits = (uint8*)bitmap->Bits();
+	for (int y = 0; y < size; y++) {
+		uint8* row = bits + y * bitmap->BytesPerRow();
+		for (int x = 0; x < size; x++) {
+			int black = 0;
+			bool opaque = mask == NULL;
+			for (int dy = 0; dy < scale; dy++) {
+				for (int dx = 0; dx < scale; dx++) {
+					black += MacIconBit(image, x * scale + dx,
+						y * scale + dy);
+					if (mask != NULL
+						&& MacIconBit(mask, x * scale + dx, y * scale + dy))
+						opaque = true;
+				}
+			}
+			if (!opaque)
+				row[x] = B_TRANSPARENT_MAGIC_CMAP8;
+			else
+				row[x] = black * 2 >= scale * scale ? kBlack : kWhite;
+		}
+	}
+	return bitmap;
 }
 
 

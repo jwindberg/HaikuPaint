@@ -10,3 +10,7 @@ reference/*
 !reference/README.md
 
 .DS_Store
+
+# Packaging
+package-stage/
+*.hpkg

@@ -23,6 +23,12 @@ make                      # uses the makefile-engine; output in objects.*-releas
 included in a standard Haiku install. If they're missing, run
 `pkgman install haiku_devel makefile_engine`.
 
+## Installing
+On Haiku, `scripts/make-package.sh` builds `HaikuPaint-<version>.hpkg` in the
+project folder; install it with `pkgman install ./HaikuPaint-*.hpkg`.
+HaikuPaint then appears in the Deskbar's Applications menu, and opens
+MacPaint documents from Tracker.
+
 ## Engine tests (anywhere)
 ```sh
 make -C tests
@@ -47,11 +53,17 @@ runs there too.
 3. GUI apps can't be displayed over SSH, so always launch HaikuPaint on the
    Haiku desktop.
 
+## License
+HaikuPaint's code is under the MIT license; see `LICENSE`. MacPaint's
+artwork, described below, is not.
+
 ## Credits
 MacPaint was written by Bill Atkinson at Apple (1984). HaikuPaint's code is
-new, but its patterns (the System file's `PAT# 0`) and its tool icons and
-cursors (MacPaint's PaintFont) are MacPaint's original 1984 artwork,
-© Apple. `tools/extract_macpaint_art.py` regenerates
-`src/engine/Patterns.cpp` and `src/ui/PaintFont.cpp` from a MacPaint 1.x
-floppy image. Behavior and layout were studied in the MacPaint source code
-released by the Computer History Museum, which isn't included here.
+new, but its patterns (the System file's `PAT# 0`), its tool icons and
+cursors (MacPaint's PaintFont), and its application, document and About
+box icons (MacPaint's `ICN#` and `ICON` resources) are MacPaint's original
+artwork, © Apple. `tools/extract_macpaint_art.py` regenerates
+`src/engine/Patterns.cpp`, `src/ui/PaintFont.cpp`, `src/ui/MacIcons.cpp`
+and `icons.rdef` from a MacPaint 1.x floppy image. Behavior and layout
+were studied in the MacPaint source code released by the Computer History
+Museum, which isn't included here.

@@ -2,6 +2,7 @@
 
 #include <Entry.h>
 
+#include "Dialogs.h"
 #include "DocumentIO.h"
 #include "MainWindow.h"
 
@@ -17,6 +18,13 @@ App::App()
 	// Created now, so files passed at launch, which can arrive before
 	// ReadyToRun(), have somewhere to go.
 	fWindow = new MainWindow();
+}
+
+
+void
+App::AboutRequested()
+{
+	(new AboutWindow())->Show();
 }
 
 

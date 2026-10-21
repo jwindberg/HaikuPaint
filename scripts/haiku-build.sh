@@ -25,6 +25,8 @@ rsync -rlpz --checksum --delete \
 	--exclude 'objects.*/' \
 	--exclude 'reference/' \
 	--exclude 'tests/test_canvas' \
+	--exclude 'package-stage/' \
+	--exclude '*.hpkg' \
 	"$PROJECT_DIR/" "$HAIKU_HOST:$HAIKU_DIR/"
 
 ssh "$HAIKU_HOST" "cd $HAIKU_DIR && make $*"

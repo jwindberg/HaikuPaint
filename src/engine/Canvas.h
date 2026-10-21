@@ -45,6 +45,15 @@ enum class Shape {
 	Oval
 };
 
+
+// How patterns are painted: Copy sets every pixel to the pattern; Or
+// (QuickDraw's patOr, MacPaint's Command key) paints only the pattern's
+// black pixels and leaves the rest alone.
+enum class PaintMode {
+	Copy,
+	Or
+};
+
 // MacPaint's corner: the diameter of a round rect's corner curves.
 static constexpr int kRoundRectCorner = 18;
 
@@ -72,6 +81,11 @@ public:
 			bool				Get(int x, int y) const;
 			void				Set(int x, int y, bool black);
 			void				Clear();
+
+			// Applies to everything below that paints a pattern, except
+			// FloodFill, which always copies.
+			void				SetPaintMode(PaintMode mode) { fMode = mode; }
+			PaintMode			GetPaintMode() const { return fMode; }
 
 			void				DrawLine(int x0, int y0, int x1, int y1,
 									bool black);
@@ -140,10 +154,16 @@ private:
 			size_t				_Index(int x, int y) const
 									{ return size_t(y) * fWidth + x; }
 			Rect				_Clip(const Rect& rect) const;
+			void				_Paint(size_t index, bool black)
+								{
+									if (black || fMode == PaintMode::Copy)
+										fPixels[index] = black ? 1 : 0;
+								}
 
 			int					fWidth;
 			int					fHeight;
 			std::vector<uint8_t> fPixels;
+			PaintMode			fMode;
 };
 
 

@@ -8,6 +8,7 @@ APP_MIME_SIG = application/x-vnd.HaikuPaint
 
 SRCS = \
 	src/engine/Canvas.cpp \
+	src/engine/Dither.cpp \
 	src/engine/MacPaintFile.cpp \
 	src/engine/Patterns.cpp \
 	src/engine/Selection.cpp \
@@ -19,13 +20,15 @@ SRCS = \
 	src/ui/Dialogs.cpp \
 	src/ui/DocumentIO.cpp \
 	src/ui/LineWidthPalette.cpp \
+	src/ui/MacIcons.cpp \
 	src/ui/MainWindow.cpp \
 	src/ui/PaintFont.cpp \
 	src/ui/PatternPalette.cpp \
+	src/ui/Printing.cpp \
 	src/ui/TextRenderer.cpp \
 	src/ui/ToolPalette.cpp
 
-RDEFS = HaikuPaint.rdef
+RDEFS = HaikuPaint.rdef icons.rdef
 
 LIBS = be tracker translation $(STDCPPLIBS)
 

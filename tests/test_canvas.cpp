@@ -2,6 +2,7 @@
 // it must build with nothing but a C++17 compiler, on macOS, Linux or Haiku.
 
 #include "Canvas.h"
+#include "Dither.h"
 #include "MacPaintFile.h"
 #include "Patterns.h"
 #include "Selection.h"
@@ -688,6 +689,77 @@ TestSymmetryAndGrid()
 }
 
 
+static void
+TestOrMode()
+{
+	// Or mode paints only the pattern's black pixels: a 50% gray over
+	// black leaves black, over white it's the gray.
+	const hp::Pattern gray = {{0xaa, 0x55, 0xaa, 0x55, 0xaa, 0x55, 0xaa,
+		0x55}};
+	hp::Canvas canvas(16, 8);
+	canvas.FillRect(0, 0, 7, 7, hp::kBlackPattern);
+	canvas.SetPaintMode(hp::PaintMode::Or);
+	canvas.FillRect(0, 0, 15, 7, gray);
+	CHECK(CountBlack(canvas) == 64 + 32);
+	canvas.FillShape(hp::Shape::Rect, {0, 0, 16, 8}, hp::kWhitePattern);
+	CHECK(CountBlack(canvas) == 64 + 32);
+
+	// Copy mode, the default, replaces.
+	canvas.SetPaintMode(hp::PaintMode::Copy);
+	canvas.FillRect(0, 0, 15, 7, gray);
+	CHECK(CountBlack(canvas) == 64);
+
+	// Brush stamps follow the mode too, like MacPaint's DrawBrush orMode.
+	hp::Mask16 full;
+	for (uint16_t& row : full.rows)
+		row = 0xffff;
+	hp::Canvas stamped(16, 16);
+	stamped.FillRect(0, 0, 15, 15, hp::kBlackPattern);
+	stamped.SetPaintMode(hp::PaintMode::Or);
+	stamped.StampMask(full, 8, 8, hp::kWhitePattern);
+	CHECK(CountBlack(stamped) == 256);
+}
+
+
+static void
+TestDither()
+{
+	const int size = 64;
+	hp::Canvas canvas(size, size);
+
+	// Solid black and white are exact.
+	hp::DitherGray(std::vector<uint8_t>(size * size, 0), size, size, canvas);
+	CHECK(CountBlack(canvas) == size * size);
+	hp::DitherGray(std::vector<uint8_t>(size * size, 255), size, size,
+		canvas);
+	CHECK(CountBlack(canvas) == 0);
+
+	// Grays come out in proportion.
+	hp::DitherGray(std::vector<uint8_t>(size * size, 128), size, size,
+		canvas);
+	int half = CountBlack(canvas);
+	CHECK(half > size * size * 45 / 100 && half < size * size * 55 / 100);
+	hp::DitherGray(std::vector<uint8_t>(size * size, 191), size, size,
+		canvas);
+	int quarter = CountBlack(canvas);
+	CHECK(quarter > size * size * 20 / 100 && quarter < size * size * 30 / 100);
+
+	// Line art passes through unchanged.
+	std::vector<uint8_t> art(size * size, 255);
+	for (int i = 0; i < size; i++)
+		art[i * size + i] = 0;
+	hp::DitherGray(art, size, size, canvas);
+	CHECK(CountBlack(canvas) == size && canvas.Get(10, 10)
+		&& !canvas.Get(11, 10));
+
+	// Cropped to the canvas, the rest cleared.
+	hp::Canvas small(10, 10);
+	small.FillRect(0, 0, 9, 9, hp::kBlackPattern);
+	hp::DitherGray(std::vector<uint8_t>(4 * 40, 0), 4, 40, small);
+	CHECK(CountBlack(small) == 4 * 10 && !small.Get(4, 0));
+}
+
+
 int
 main()
 {
@@ -714,6 +786,8 @@ main()
 	TestTraceEdges();
 	TestSelectionClipboardFormat();
 	TestSymmetryAndGrid();
+	TestOrMode();
+	TestDither();
 
 	if (sFailures != 0) {
 		std::fprintf(stderr, "%d check(s) failed\n", sFailures);

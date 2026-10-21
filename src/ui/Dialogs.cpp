@@ -8,6 +8,7 @@
 
 #include "BitmapUtils.h"
 #include "Geometry.h"
+#include "MacIcons.h"
 #include "Messages.h"
 #include "Selection.h"
 
@@ -574,4 +575,69 @@ MirrorWindow::MessageReceived(BMessage* message)
 			BWindow::MessageReceived(message);
 			break;
 	}
+}
+
+
+// #pragma mark - AboutWindow
+
+
+// MacPaint's About box, DLOG 2006: text at the left, the icon at
+// (290, 16), OK below it.
+class AboutView : public BView {
+public:
+	AboutView(BRect frame)
+		:
+		BView(frame, "about", B_FOLLOW_ALL, B_WILL_DRAW),
+		fIcon(NewMacIconBitmap(kAboutIcon, NULL, 32))
+	{
+		SetViewColor(255, 255, 255);
+	}
+
+	virtual ~AboutView()
+	{
+		delete fIcon;
+	}
+
+	virtual void Draw(BRect updateRect)
+	{
+		const char* lines[] = {
+			"HaikuPaint version 0.6",
+			"after MacPaint, written by Bill Atkinson",
+			"MacPaint copyright 1983, Apple Computer Inc."
+		};
+		font_height height;
+		GetFontHeight(&height);
+		SetHighColor(0, 0, 0);
+		for (int i = 0; i < 3; i++)
+			DrawString(lines[i], BPoint(6, 14 + i * 24 + height.ascent));
+		DrawBitmap(fIcon, BPoint(290, 16));
+	}
+
+private:
+	BBitmap*	fIcon;
+};
+
+
+AboutWindow::AboutWindow()
+	:
+	BWindow(BRect(0, 0, 355, 99), "About HaikuPaint", B_MODAL_WINDOW_LOOK,
+		B_MODAL_APP_WINDOW_FEEL,
+		B_NOT_RESIZABLE | B_NOT_ZOOMABLE | B_ASYNCHRONOUS_CONTROLS)
+{
+	BView* view = new AboutView(Bounds());
+	AddChild(view);
+	BButton* ok = AddButton(view, 274, 60, 346, "OK", kMsgOK);
+	SetDefaultButton(ok);
+	AddShortcut(B_ESCAPE, 0, new BMessage(kMsgOK));
+	CenterOnScreen();
+}
+
+
+void
+AboutWindow::MessageReceived(BMessage* message)
+{
+	if (message->what == kMsgOK)
+		Quit();
+	else
+		BWindow::MessageReceived(message);
 }

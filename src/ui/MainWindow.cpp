@@ -1,6 +1,7 @@
 #include "MainWindow.h"
 
 #include <Alert.h>
+#include <Application.h>
 #include <Clipboard.h>
 #include <Directory.h>
 #include <FilePanel.h>
@@ -19,6 +20,7 @@
 #include "Messages.h"
 #include "PatternPalette.h"
 #include "Patterns.h"
+#include "Printing.h"
 #include "Symmetry.h"
 #include "ToolPalette.h"
 
@@ -30,6 +32,9 @@ enum {
 	kMsgOpen			= 'open',
 	kMsgSave			= 'save',
 	kMsgSaveAs			= 'svas',
+	kMsgRevert			= 'rvrt',
+	kMsgPageSetup		= 'pgst',
+	kMsgPrint			= 'prnt',
 	kMsgExport			= 'expt',
 	kMsgSaveRequested	= 'svrq',
 	kMsgExportRequested	= 'exrq',
@@ -56,7 +61,8 @@ MainWindow::MainWindow()
 	fMirrors(0),
 	fHasRef(false),
 	fName(kUntitled),
-	fPendingAction(kPendingNone)
+	fPendingAction(kPendingNone),
+	fPrintSettings(NULL)
 {
 	std::memcpy(fPatterns, hp::kPatterns, sizeof(fPatterns));
 	fCanvasView = new CanvasView();
@@ -107,6 +113,7 @@ MainWindow::~MainWindow()
 	delete fOpenPanel;
 	delete fSavePanel;
 	delete fExportPanel;
+	delete fPrintSettings;
 }
 
 
@@ -139,6 +146,28 @@ MainWindow::MessageReceived(BMessage* message)
 		case kMsgSaveAs:
 			_ShowSavePanel();
 			break;
+
+		case kMsgPageSetup:
+			ConfigurePage(&fPrintSettings);
+			break;
+
+		case kMsgPrint:
+			PrintPage(fCanvasView->Image(), fName.String(), &fPrintSettings);
+			break;
+
+		case kMsgRevert:
+		{
+			if (!fHasRef)
+				break;
+			// MacPaint's Revert alert.
+			BAlert* alert = new BAlert("Revert",
+				"Revert to the last version saved?", "Cancel", "OK", NULL,
+				B_WIDTH_AS_USUAL, B_WARNING_ALERT);
+			alert->SetShortcut(0, B_ESCAPE);
+			if (alert->Go() == 1)
+				_Open(fRef);
+			break;
+		}
 
 		case kMsgExport:
 		{
@@ -387,6 +416,7 @@ void
 MainWindow::MenusBeginning()
 {
 	fUndoItem->SetEnabled(fCanvasView->CanUndo());
+	fRevertItem->SetEnabled(fHasRef && fCanvasView->IsDirty());
 
 	bool selection = fCanvasView->HasSelection();
 	for (BMenuItem* item : fSelectionItems)
@@ -419,6 +449,11 @@ MainWindow::_BuildMenuBar()
 	BMenuBar* menuBar = new BMenuBar("menubar");
 
 	BMenu* fileMenu = new BMenu("File");
+	BMenuItem* aboutItem = new BMenuItem("About HaikuPaint" B_UTF8_ELLIPSIS,
+		new BMessage(B_ABOUT_REQUESTED));
+	aboutItem->SetTarget(be_app);
+	fileMenu->AddItem(aboutItem);
+	fileMenu->AddSeparatorItem();
 	fileMenu->AddItem(new BMenuItem("New", new BMessage(kMsgNew), 'N'));
 	fileMenu->AddItem(new BMenuItem("Open" B_UTF8_ELLIPSIS,
 		new BMessage(kMsgOpen), 'O'));
@@ -426,8 +461,16 @@ MainWindow::_BuildMenuBar()
 	fileMenu->AddItem(new BMenuItem("Save", new BMessage(kMsgSave), 'S'));
 	fileMenu->AddItem(new BMenuItem("Save as" B_UTF8_ELLIPSIS,
 		new BMessage(kMsgSaveAs), 'S', B_SHIFT_KEY));
+	fRevertItem = new BMenuItem("Revert", new BMessage(kMsgRevert));
+	fileMenu->AddItem(fRevertItem);
 	fileMenu->AddItem(new BMenuItem("Export as PNG" B_UTF8_ELLIPSIS,
 		new BMessage(kMsgExport)));
+	fileMenu->AddSeparatorItem();
+	// No shortcut: Alt+P is MacPaint's Plain, and MacPaint had none.
+	fileMenu->AddItem(new BMenuItem("Page setup" B_UTF8_ELLIPSIS,
+		new BMessage(kMsgPageSetup)));
+	fileMenu->AddItem(new BMenuItem("Print" B_UTF8_ELLIPSIS,
+		new BMessage(kMsgPrint)));
 	fileMenu->AddSeparatorItem();
 	fileMenu->AddItem(new BMenuItem("Quit", new BMessage(B_QUIT_REQUESTED),
 		'Q'));

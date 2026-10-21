@@ -7,9 +7,14 @@ Reads, without running anything from the disk:
   - MacPaint, FONT 31884 (= font 249 at 12 pt, "PaintFont"): the tool
     icons, cursors, check mark and brush shapes, drawn as characters.
 
+  - MacPaint, ICN# 128 and 129 and ICON 2006: the application and
+    document icons, and the "BILL ICON" from the About box.
+
 Writes, relative to the project root:
   src/engine/Patterns.cpp
   src/ui/PaintFont.cpp
+  src/ui/MacIcons.cpp
+  icons.rdef (the application's Tracker icons)
 
 Usage: python3 -I tools/extract_macpaint_art.py <disk.dsk> [project-root]
 """
@@ -175,6 +180,55 @@ def write_font(path, height, glyphs):
         f.write('\n'.join(lines))
 
 
+def icon_bit(data, x, y):
+    return (data[y * 4 + x // 8] >> (7 - x % 8)) & 1
+
+
+def write_mac_icons(path, icons):
+    lines = [HEADER.format(source="MacPaint's ICN# 128 and 129 and ICON "
+                           '2006 resources'),
+             '#include "MacIcons.h"', '', '']
+    for name, data in icons:
+        lines.append(f'const uint8_t {name}[kMacIconBytes] = {{')
+        for i in range(0, 128, 8):
+            lines.append('\t' + ', '.join(f'0x{b:02x}' for b in data[i:i + 8])
+                         + ',')
+        lines += ['};', '']
+    with open(path, 'w') as f:
+        f.write('\n'.join(lines))
+
+
+def cmap8_icon(image, mask, size):
+    """Haiku's classic B_CMAP8 icon: black 0x00, white 0x3f, transparent
+    0xff. The 16 x 16 one reduces 2 x 2 blocks."""
+    scale = 32 // size
+    out = bytearray()
+    for y in range(size):
+        for x in range(size):
+            cells = [(x * scale + dx, y * scale + dy)
+                     for dy in range(scale) for dx in range(scale)]
+            if not any(icon_bit(mask, cx, cy) for cx, cy in cells):
+                out.append(0xff)
+                continue
+            black = sum(icon_bit(image, cx, cy) for cx, cy in cells)
+            out.append(0x00 if black * 2 >= len(cells) else 0x3f)
+    return bytes(out)
+
+
+def write_icon_rdef(path, image, mask):
+    lines = ['/*'] + [' * ' + line for line in HEADER.format(
+        source="MacPaint's application icon, ICN# 128").replace(
+            '// ', '').splitlines()] + [' */', '']
+    for kind, size in (('large_icon', 32), ('mini_icon', 16)):
+        data = cmap8_icon(image, mask, size)
+        lines.append(f'resource {kind} array {{')
+        for i in range(0, len(data), size):
+            lines.append('\t$"' + data[i:i + size].hex().upper() + '"')
+        lines += ['};', '']
+    with open(path, 'w') as f:
+        f.write('\n'.join(lines))
+
+
 def main():
     if len(sys.argv) < 2:
         sys.exit(__doc__)
@@ -187,12 +241,25 @@ def main():
         resource(volume.resource_fork('System'), 'PAT#', PATTERN_LIST_ID))
     if len(patterns) != 38:
         sys.exit(f'expected 38 patterns, found {len(patterns)}')
-    height, glyphs = decode_font(
-        resource(volume.resource_fork('MacPaint'), 'FONT', PAINT_FONT_ID))
+    macpaint = volume.resource_fork('MacPaint')
+    height, glyphs = decode_font(resource(macpaint, 'FONT', PAINT_FONT_ID))
+
+    # ICN# is the 32 x 32 image followed by its mask; ICON is just an image.
+    app = resource(macpaint, 'ICN#', 128)
+    document = resource(macpaint, 'ICN#', 129)
+    about = resource(macpaint, 'ICON', 2006)
 
     write_patterns(os.path.join(root, 'src/engine/Patterns.cpp'), patterns)
     write_font(os.path.join(root, 'src/ui/PaintFont.cpp'), height, glyphs)
-    print(f'Wrote {len(patterns)} patterns and {len(glyphs)} glyphs.')
+    write_mac_icons(os.path.join(root, 'src/ui/MacIcons.cpp'), [
+        ('kAppIcon', app[:128]), ('kAppIconMask', app[128:256]),
+        ('kDocumentIcon', document[:128]),
+        ('kDocumentIconMask', document[128:256]),
+        ('kAboutIcon', about[:128])])
+    write_icon_rdef(os.path.join(root, 'icons.rdef'), app[:128],
+                    app[128:256])
+    print(f'Wrote {len(patterns)} patterns, {len(glyphs)} glyphs and '
+          '3 icons.')
 
 
 if __name__ == '__main__':

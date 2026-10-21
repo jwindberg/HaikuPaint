@@ -70,4 +70,14 @@ private:
 };
 
 
+// About HaikuPaint, after MacPaint's About box (DLOG 2006): three lines of
+// text and the "BILL ICON", Bill Atkinson's portrait.
+class AboutWindow : public BWindow {
+public:
+								AboutWindow();
+
+	virtual	void				MessageReceived(BMessage* message);
+};
+
+
 #endif	// DIALOGS_H

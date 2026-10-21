@@ -24,7 +24,8 @@ class BMessageRunner;
 // fBitmap (what the app_server draws) in sync with the canvas.
 //
 // MacPaint's modifier keys map to Haiku as Option -> Ctrl and
-// Command -> Alt.
+// Command -> Alt: Ctrl draws lines and borders in the pattern, Alt paints
+// in OR mode, and on selections Ctrl copies and Alt stretches.
 class CanvasView : public BView {
 public:
 								CanvasView();
@@ -162,6 +163,8 @@ private:
 			hp::Rect			_PointsBounds(
 									const std::vector<hp::Point>& points) const;
 			std::vector<hp::Point> _PenPoints() const;
+			// Command (Alt) paints in OR mode, as in MacPaint.
+			void				_SetPaintMode();
 			const hp::Pattern&	_LinePattern() const;
 			bool				_ShiftDown() const;
 			bool				_OptionDown() const;

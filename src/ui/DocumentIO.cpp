@@ -21,6 +21,7 @@
 
 #include "App.h"
 #include "BitmapUtils.h"
+#include "MacIcons.h"
 #include "MacPaintFile.h"
 #include "Patterns.h"
 
@@ -57,6 +58,20 @@ InstallMacPaintMimeType()
 		extensions.AddString("extensions", "pntg");
 		extensions.AddString("extensions", "pnt");
 		mime.SetFileExtensions(&extensions);
+	}
+
+	// MacPaint's own document icon, unless the type has one already.
+	BBitmap existing(BRect(0, 0, 31, 31), B_CMAP8);
+	if (mime.GetIcon(&existing, B_LARGE_ICON) != B_OK) {
+		const struct {
+			icon_size	which;
+			int			size;
+		} icons[] = {{B_LARGE_ICON, 32}, {B_MINI_ICON, 16}};
+		for (const auto& icon : icons) {
+			std::unique_ptr<BBitmap> bitmap(NewMacIconBitmap(kDocumentIcon,
+				kDocumentIconMask, icon.size));
+			mime.SetIcon(bitmap.get(), icon.which);
+		}
 	}
 }
 

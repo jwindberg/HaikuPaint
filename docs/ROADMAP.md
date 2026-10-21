@@ -37,9 +37,9 @@ Keep each milestone shippable. Engine work comes with tests in
       translator reads to black and white; File > Export as PNG
 - [x] MIME type image/x-macpaint (.mac, .pntg, .pnt), "unsaved changes"
       prompt for New, Open and Quit
-- [ ] Document icon (HVIF) for MacPaint files
+- [x] Document icon for MacPaint files (MacPaint's own ICN# 129, M6)
 - [x] Use the patterns saved in a document (with Edit Pattern, M5)
-- [ ] Dither instead of threshold when converting color images
+- [x] Dither instead of threshold when converting color images (M6)
 
 ## M4: Selections (done, pending testing on Haiku)
 - [x] Marquee: select, move, Ctrl-drag to copy (MacPaint's Option),
@@ -53,7 +53,7 @@ Keep each milestone shippable. Engine work comes with tests in
 - [x] Edit transforms: Invert, Fill, Trace Edges (Shift: shadow), Flip
       horizontal/vertical, Rotate
 - [x] Ctrl draws lines and borders in the current pattern (JamLine)
-- [ ] Command (Alt) as OR mode for painting (JamLine/JamFill's patOr)
+- [x] Command (Alt) as OR mode for painting (JamLine/JamFill's patOr, M6)
 
 ## M5: Goodies (done, pending testing on Haiku)
 - [x] Goodies menu: Grid, FatBits, Show Page, Edit Pattern, Brush Shape,
@@ -67,6 +67,20 @@ Keep each milestone shippable. Engine work comes with tests in
 - [x] Brush mirrors (MapSym)
 - [x] Text tool with Font, FontSize and Style menus, live until accepted
 
+## M6: Finishing touches (done, pending testing on Haiku)
+- [x] OR mode: Alt paints only a pattern's black pixels (patOr), for lines,
+      shapes, polygons, freeforms, the brush and the spray can
+- [x] File > Revert, with MacPaint's alert
+- [x] About HaikuPaint, after MacPaint's About box with the "BILL ICON"
+- [x] MacPaint's application icon (ICN# 128) for the app, its document icon
+      (ICN# 129) for image/x-macpaint
+- [x] Floyd-Steinberg dithering for opened and pasted images
+      (`src/engine/Dither`)
+- [x] File > Page setup and Print, through the print kit; 8 x 10 inches,
+      scaled down to fit
+- [x] MIT license; `scripts/make-package.sh` builds an .hpkg
+
 ## Later
 - [ ] Localization (Haiku's Locale Kit)
-- [ ] Package as an .hpkg, submit to HaikuPorts
+- [ ] Submit the package to HaikuPorts (a recipe in haikuports)
+- [ ] MacPaint's Print Catalog (thumbnails of several documents)

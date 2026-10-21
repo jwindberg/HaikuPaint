@@ -400,6 +400,7 @@ CanvasView::MouseDown(BPoint where)
 		if (!fPolygonActive) {
 			_BeginOperation();
 			_BeginPreview();
+			_SetPaintMode();
 			fPoints.assign(1, point);
 			fPolygonActive = true;
 		}
@@ -409,6 +410,7 @@ CanvasView::MouseDown(BPoint where)
 	fStart = fLast = point;
 	fAxisLock = hp::AxisLock(point);
 	_BeginOperation();
+	_SetPaintMode();
 
 	switch (fTool) {
 		case Tool::PaintBucket:
@@ -639,6 +641,7 @@ CanvasView::MouseUp(BPoint where)
 		_FinishFilledFreeform();
 	else if (fTool == Tool::Line || IsShapeTool(fTool))
 		_DragTo(point);
+	fCanvas.SetPaintMode(hp::PaintMode::Copy);
 }
 
 
@@ -705,6 +708,7 @@ CanvasView::Undo()
 
 	// Swapping makes the next Undo a redo, as in MacPaint.
 	std::swap(fCanvas, fUndo);
+	fCanvas.SetPaintMode(hp::PaintMode::Copy);
 	fDirty = true;
 	_CanvasChanged(_CanvasBounds());
 }
@@ -1011,6 +1015,7 @@ CanvasView::_FinishPolygon(bool closed)
 
 	fPolygonActive = false;
 	fPoints.clear();
+	fCanvas.SetPaintMode(hp::PaintMode::Copy);
 }
 
 
@@ -1407,6 +1412,17 @@ CanvasView::_PenPoints() const
 	for (const hp::Point& point : fPoints)
 		pen.push_back(_PenPoint(point));
 	return pen;
+}
+
+
+void
+CanvasView::_SetPaintMode()
+{
+	// JamLine/JamFill: Command paints in patOr, for everything but the
+	// tools that don't use patterns that way.
+	bool orMode = _CommandDown() && fTool != Tool::Eraser
+		&& fTool != Tool::Pencil && fTool != Tool::PaintBucket;
+	fCanvas.SetPaintMode(orMode ? hp::PaintMode::Or : hp::PaintMode::Copy);
 }
 
 

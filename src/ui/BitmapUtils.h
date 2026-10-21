@@ -21,8 +21,8 @@ void		SetBitmapPixel(BBitmap* bitmap, int x, int y, bool black);
 BBitmap*	NewBitmapFromCanvas(const hp::Canvas& canvas);
 
 // Converts any bitmap to black and white into the top left of canvas,
-// clearing the rest: transparent counts as white, otherwise the luminance
-// is thresholded. Cropped to the canvas.
+// clearing the rest: transparent counts as white, and grays are dithered.
+// Cropped to the canvas.
 status_t	CanvasFromBitmap(const BBitmap* source, hp::Canvas& canvas);
 
 // Draws a PaintFont glyph with the pen at (penX, top); see PaintFont.h.
@@ -46,6 +46,12 @@ void		DrawPaletteBox(hp::Canvas& canvas);
 // A PaintFont glyph drawn at pen (0, 0) into 16 x 16 bits, the way MacPaint
 // builds its cursors; brushes paint through these.
 hp::Mask16	MaskFromGlyph(int code);
+
+// A B_CMAP8 icon of size 32 or 16 (2 x 2 blocks reduced) from a QuickDraw
+// 32 x 32 icon and its mask (see MacIcons.h), for BMimeType::SetIcon().
+// mask may be NULL for an opaque icon. The caller owns it.
+BBitmap*	NewMacIconBitmap(const uint8_t* image, const uint8_t* mask,
+				int size);
 
 // A 16 x 16 cursor from PaintFont glyphs drawn at pen (0, 0), as MacPaint's
 // SetToolCursor does. mask may be NULL. Pixels set in data but not in mask
