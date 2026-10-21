@@ -23,7 +23,9 @@ WARNINGS = ALL
 SYMBOLS :=
 DEBUGGER :=
 
-COMPILER_FLAGS = -std=c++17
+## C++17 is gcc 13's default; COMPILER_FLAGS would also reach the C
+## preprocessor that handles the .rdef, which warns about -std=c++17.
+COMPILER_FLAGS =
 
 ## Include the makefile-engine
 DEVEL_DIRECTORY := \

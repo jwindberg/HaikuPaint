@@ -8,14 +8,16 @@
 set -e
 
 if [ -z "$MAC_HOST" ]; then
-	echo "Set MAC_HOST, e.g. MAC_HOST=jwindberg@192.168.7.10 $0" >&2
+	echo "Set MAC_HOST, e.g. MAC_HOST=jwindberg@192.168.7.75 $0" >&2
 	exit 1
 fi
 
 MAC_DIR="${MAC_DIR:-Projects/haiku/HaikuPaint}"
 LOCAL_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 
-rsync -az \
+# Deliberately no -t: copied files get the receiver's current time, so make
+# still works when the two clocks disagree. --checksum skips unchanged files.
+rsync -rlpz --checksum \
 	--exclude '.git/' \
 	--exclude 'objects.*/' \
 	--exclude 'reference/' \
