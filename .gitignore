@@ -1,0 +1,12 @@
+# makefile-engine output
+objects.*/
+
+# Host test binary
+tests/test_canvas
+tests/*.dSYM/
+
+# Apple's MacPaint/QuickDraw source: CHM license forbids redistribution.
+reference/*
+!reference/README.md
+
+.DS_Store
