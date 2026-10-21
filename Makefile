@@ -11,9 +11,11 @@ SRCS = \
 	src/engine/Patterns.cpp \
 	src/ui/App.cpp \
 	src/ui/BitmapUtils.cpp \
+	src/ui/BrushWindow.cpp \
 	src/ui/CanvasView.cpp \
 	src/ui/LineWidthPalette.cpp \
 	src/ui/MainWindow.cpp \
+	src/ui/PaintFont.cpp \
 	src/ui/PatternPalette.cpp \
 	src/ui/ToolPalette.cpp
 

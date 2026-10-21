@@ -4,190 +4,73 @@
 #include <Window.h>
 
 #include "BitmapUtils.h"
+#include "PaintFont.h"
 
 
-static const int kIconSize = 16;
-static const int kCellSize = 28;
-static const int kColumns = 2;
-
-
-static const char* const kPencilIcon[] = {
-	"................",
-	"................",
-	"...........#....",
-	"..........#.#...",
-	".........#...#..",
-	"........#...#...",
-	".......#...#....",
-	"......#...#.....",
-	".....#...#......",
-	"....#...#.......",
-	"....##.#........",
-	"...#.##.........",
-	"...###..........",
-	"..#.............",
-	"................",
-	"................",
-};
-
-static const char* const kLineIcon[] = {
-	"................",
-	"................",
-	".............#..",
-	"............#...",
-	"...........#....",
-	"..........#.....",
-	".........#......",
-	"........#.......",
-	".......#........",
-	"......#.........",
-	".....#..........",
-	"....#...........",
-	"...#............",
-	"..#.............",
-	"................",
-	"................",
-};
-
-static const char* const kPaintBucketIcon[] = {
-	"................",
-	"................",
-	".....######.....",
-	"....#......#....",
-	"....#......#....",
-	"...#........#...",
-	"...##########...",
-	"...#........##..",
-	"....#......#..#.",
-	"....########..#.",
-	"....#......#..#.",
-	"....#......#....",
-	".....#....#...#.",
-	".....######.....",
-	"................",
-	"................",
-};
-
-static const char* const kEraserIcon[] = {
-	"................",
-	"................",
-	"................",
-	"................",
-	".....#########..",
-	"....#.......##..",
-	"...#.......#.#..",
-	"..#########..#..",
-	"..#.......#..#..",
-	"..#.......#..#..",
-	"..#.......#.#...",
-	"..#.......##....",
-	"..#########.....",
-	"................",
-	"................",
-	"................",
-};
-
-
-struct ToolInfo {
-	Tool				tool;
-	const char* const*	icon;
-};
-
-static const ToolInfo kTools[] = {
-	{Tool::Pencil, kPencilIcon},
-	{Tool::Line, kLineIcon},
-	{Tool::PaintBucket, kPaintBucketIcon},
-	{Tool::Eraser, kEraserIcon},
-};
-
-static const int kToolCount = sizeof(kTools) / sizeof(kTools[0]);
-static const int kRows = (kToolCount + kColumns - 1) / kColumns;
-
-
-static BBitmap*
-NewInvertedBitmap(const BBitmap* source)
-{
-	BBitmap* bitmap = new BBitmap(source);
-	uint32* pixel = (uint32*)bitmap->Bits();
-	int32 count = bitmap->BitsLength() / 4;
-	for (int32 i = 0; i < count; i++)
-		pixel[i] = pixel[i] == kBlackPixel ? kWhitePixel : kBlackPixel;
-	return bitmap;
-}
+// MacPaint.p's toolLeft/Right/Top/Bottom/Mid and toolSpace, relative to
+// the palette's top left corner.
+static const int kWidth = 53;
+static const int kHeight = 221;
+static const int kMid = 26;
+static const int kRowSpace = 22;
+static const int kRows = kToolCount / 2;
 
 
 ToolPalette::ToolPalette()
 	:
 	BView("tools", B_WILL_DRAW),
+	fBitmap(NULL),
 	fTool(Tool::Pencil)
 {
-	for (const ToolInfo& info : kTools) {
-		BBitmap* icon = NewBitmapFromArt(info.icon, kIconSize, kIconSize);
-		fIcons.push_back(icon);
-		fSelectedIcons.push_back(NewInvertedBitmap(icon));
-	}
-
-	// Cells share their borders, so the grid is one pixel wider than the
-	// cells; BSize already counts that extra pixel.
-	BSize size(kColumns * kCellSize, kRows * kCellSize);
+	// One extra pixel each way for the drop shadow; BSize counts from 0.
+	BSize size(kWidth, kHeight);
 	SetExplicitMinSize(size);
 	SetExplicitMaxSize(size);
 	SetViewUIColor(B_PANEL_BACKGROUND_COLOR);
+	_Render();
 }
 
 
 ToolPalette::~ToolPalette()
 {
-	for (BBitmap* icon : fIcons)
-		delete icon;
-	for (BBitmap* icon : fSelectedIcons)
-		delete icon;
+	delete fBitmap;
 }
 
 
 void
 ToolPalette::Draw(BRect updateRect)
 {
-	for (int i = 0; i < kToolCount; i++) {
-		BRect frame = _CellFrame(i);
-		bool selected = kTools[i].tool == fTool;
-
-		if (selected)
-			SetHighColor(0, 0, 0);
-		else
-			SetHighColor(255, 255, 255);
-		FillRect(frame);
-		SetHighColor(0, 0, 0);
-		StrokeRect(frame);
-
-		float inset = (kCellSize - kIconSize) / 2;
-		DrawBitmap(selected ? fSelectedIcons[i] : fIcons[i],
-			BPoint(frame.left + inset, frame.top + inset));
-	}
+	DrawBitmap(fBitmap, BPoint(0, 0));
 }
 
 
 void
 ToolPalette::MouseDown(BPoint where)
 {
-	for (int i = 0; i < kToolCount; i++) {
-		if (!_CellFrame(i).Contains(where))
-			continue;
+	if (where.x < 1 || where.x >= kWidth - 1 || where.y < 1
+		|| where.y >= kHeight - 1)
+		return;
 
-		int32 clicks = 1;
-		if (BMessage* current = Window()->CurrentMessage())
-			current->FindInt32("clicks", &clicks);
+	int row = ((int)where.y - 1) / kRowSpace;
+	Tool tool = (Tool)(2 * row + (where.x > kMid ? 1 : 0));
+	if (!IsToolImplemented(tool))
+		return;
 
-		if (kTools[i].tool == Tool::Eraser && clicks >= 2) {
-			Window()->PostMessage(kMsgClear);
-			return;
-		}
-
-		BMessage message(kMsgSetTool);
-		message.AddInt32("tool", (int32)kTools[i].tool);
-		Window()->PostMessage(&message);
+	// Double-clicks, as in MacPaint: the eraser clears the page, the brush
+	// opens the brush shapes.
+	int32 clicks = 1;
+	if (BMessage* current = Window()->CurrentMessage())
+		current->FindInt32("clicks", &clicks);
+	if (clicks >= 2 && tool == Tool::Eraser) {
+		Window()->PostMessage(kMsgClear);
 		return;
 	}
+	if (clicks >= 2 && tool == Tool::Brush)
+		Window()->PostMessage(kMsgChooseBrush);
+
+	BMessage message(kMsgSetTool);
+	message.AddInt32("tool", (int32)tool);
+	Window()->PostMessage(&message);
 }
 
 
@@ -197,15 +80,43 @@ ToolPalette::SetTool(Tool tool)
 	if (tool == fTool)
 		return;
 	fTool = tool;
+	_Render();
 	Invalidate();
 }
 
 
-BRect
-ToolPalette::_CellFrame(int index) const
+void
+ToolPalette::_Render()
 {
-	int column = index % kColumns;
-	int row = index / kColumns;
-	return BRect(column * kCellSize, row * kCellSize,
-		(column + 1) * kCellSize, (row + 1) * kCellSize);
+	// Follows MacPaint's DrawTool and InvTool.
+	hp::Canvas canvas(kWidth + 1, kHeight + 1);
+	DrawPaletteBox(canvas);
+	canvas.DrawLine(kMid, 0, kMid, kHeight, true);
+
+	int v = 0;
+	int code = kGlyphFirstTool;
+	for (int row = 0; row < kRows; row++) {
+		for (int column = 0; column < 2; column++, code++) {
+			const Glyph* glyph = PaintFontGlyph(code);
+			if (glyph == NULL)
+				continue;
+			int cellLeft = column == 0 ? 0 : kMid;
+			DrawGlyph(canvas, *glyph, cellLeft + 14 - glyph->advance / 2,
+				v + 4);
+		}
+		v += kRowSpace;
+		if (row != kRows - 1)
+			canvas.DrawLine(0, v, kWidth - 1, v, true);
+	}
+
+	int selected = (int)fTool;
+	int top = 1 + (selected / 2) * kRowSpace;
+	int bottom = top + kRowSpace - 1;
+	if (selected % 2 == 1)
+		InvertQDRect(canvas, kMid + 1, top, kWidth - 1, bottom);
+	else
+		InvertQDRect(canvas, 1, top, kMid, bottom);
+
+	delete fBitmap;
+	fBitmap = NewBitmapFromCanvas(canvas);
 }

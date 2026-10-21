@@ -10,6 +10,8 @@
 #include <cstdint>
 #include <vector>
 
+#include "Geometry.h"
+
 
 namespace hp {
 
@@ -25,6 +27,26 @@ struct Pattern {
 
 extern const Pattern kBlackPattern;
 extern const Pattern kWhitePattern;
+
+
+// A 16 x 16 1-bit mask (MacPaint's Bits16): one word per row, MSB leftmost.
+// Brushes and the spray can paint the current pattern through one.
+struct Mask16 {
+	uint16_t rows[16];
+
+	bool Bit(int x, int y) const
+		{ return (rows[y] >> (15 - x)) & 1; }
+};
+
+
+enum class Shape {
+	Rect,
+	RoundRect,
+	Oval
+};
+
+// MacPaint's corner: the diameter of a round rect's corner curves.
+static constexpr int kRoundRectCorner = 18;
 
 
 // A 1-bit image. true/1 is black, false/0 is white.
@@ -65,11 +87,51 @@ public:
 			void				FloodFill(int x, int y,
 									const Pattern& pattern);
 
+			// QuickDraw's PaintRect/PaintRoundRect/PaintOval: fills the
+			// shape inscribed in rect.
+			void				FillShape(Shape shape, const Rect& rect,
+									const Pattern& pattern);
+
+			// QuickDraw's FrameRect/FrameRoundRect/FrameOval: the shape
+			// minus the same shape inset by penSize, so the border lies
+			// inside rect.
+			void				FrameShape(Shape shape, const Rect& rect,
+									int penSize, const Pattern& pattern);
+
+			// Fills the polygon (implicitly closed) using the even-odd
+			// rule, testing pixel centers.
+			void				FillPolygon(const std::vector<Point>& points,
+									const Pattern& pattern);
+
+			// StrokeLine through consecutive points; also from the last
+			// point back to the first when closed.
+			void				StrokePolyline(
+									const std::vector<Point>& points,
+									bool closed, int penSize,
+									const Pattern& pattern);
+
+			// MacPaint's DrawBrush: paints the pattern wherever the mask is
+			// set, with the mask centered on (centerX, centerY), i.e. its
+			// top left at (centerX - 8, centerY - 8). Other pixels are left
+			// alone.
+			void				StampMask(const Mask16& mask, int centerX,
+									int centerY, const Pattern& pattern);
+
+			// MacPaint's BrushLine: stamps along the line from (x0, y0) to
+			// (x1, y1), one stamp per step, not including the start.
+			void				StrokeMask(const Mask16& mask, int x0, int y0,
+									int x1, int y1, const Pattern& pattern);
+
+			// Copies the pixels of rect from source, which must be the same
+			// size. Used to restore a snapshot under a live preview.
+			void				CopyRect(const Canvas& source, Rect rect);
+
 			const std::vector<uint8_t>& Pixels() const { return fPixels; }
 
 private:
 			size_t				_Index(int x, int y) const
 									{ return size_t(y) * fWidth + x; }
+			Rect				_Clip(const Rect& rect) const;
 
 			int					fWidth;
 			int					fHeight;

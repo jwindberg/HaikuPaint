@@ -6,6 +6,7 @@
 #include <MenuItem.h>
 #include <ScrollView.h>
 
+#include "BrushWindow.h"
 #include "CanvasView.h"
 #include "LineWidthPalette.h"
 #include "Messages.h"
@@ -29,18 +30,25 @@ MainWindow::MainWindow()
 	fLineWidthPalette = new LineWidthPalette();
 	fPatternPalette = new PatternPalette();
 
+	// As in MacPaint: tools above the line palette on the left, patterns
+	// below the document.
 	BLayoutBuilder::Group<>(this, B_VERTICAL, 0)
 		.Add(_BuildMenuBar())
-		.AddGroup(B_HORIZONTAL, 0)
+		.AddGroup(B_HORIZONTAL, B_USE_SMALL_SPACING)
+			.SetInsets(B_USE_SMALL_SPACING)
 			.AddGroup(B_VERTICAL, B_USE_SMALL_SPACING)
-				.SetInsets(B_USE_SMALL_SPACING)
 				.Add(fToolPalette)
-				.Add(fLineWidthPalette)
 				.AddGlue()
+				.Add(fLineWidthPalette)
 			.End()
-			.Add(scrollView)
-		.End()
-		.Add(fPatternPalette);
+			.AddGroup(B_VERTICAL, B_USE_SMALL_SPACING)
+				.Add(scrollView)
+				.AddGroup(B_HORIZONTAL, 0)
+					.Add(fPatternPalette)
+					.AddGlue()
+				.End()
+			.End()
+		.End();
 }
 
 
@@ -76,10 +84,27 @@ MainWindow::MessageReceived(BMessage* message)
 		case kMsgSetLineWidth:
 		{
 			int32 width;
+			bool border = message->GetBool("border", true);
 			if (message->FindInt32("width", &width) == B_OK) {
-				fCanvasView->SetLineWidth(width);
-				fLineWidthPalette->SetLineWidth(width);
+				fCanvasView->SetLineWidth(width, border);
+				fLineWidthPalette->SetLineWidth(width, border);
 			}
+			break;
+		}
+
+		case kMsgChooseBrush:
+		{
+			BrushWindow* window = new BrushWindow(Frame(),
+				fCanvasView->Brush(), BMessenger(this));
+			window->Show();
+			break;
+		}
+
+		case kMsgSetBrush:
+		{
+			int32 brush;
+			if (message->FindInt32("brush", &brush) == B_OK)
+				fCanvasView->SetBrush(brush);
 			break;
 		}
 

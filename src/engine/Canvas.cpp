@@ -1,7 +1,9 @@
 #include "Canvas.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdlib>
+#include <cstring>
 #include <utility>
 
 
@@ -113,6 +115,225 @@ Canvas::StrokeLine(int x0, int y0, int x1, int y1, int penSize,
 	ForEachLinePoint(x0, y0, x1, y1, [&](int x, int y) {
 		FillRect(x, y, x + penSize - 1, y + penSize - 1, pattern);
 	});
+}
+
+
+// Whether the center of pixel (x, y) is inside the ellipse inscribed in rect.
+static bool
+InsideEllipse(const Rect& rect, int x, int y)
+{
+	double a = rect.Width() / 2.0;
+	double b = rect.Height() / 2.0;
+	double dx = (x + 0.5 - (rect.left + a)) / a;
+	double dy = (y + 0.5 - (rect.top + b)) / b;
+	return dx * dx + dy * dy <= 1.0;
+}
+
+
+// Whether pixel (x, y) is inside the shape inscribed in rect. corner is the
+// round rect corner diameter.
+static bool
+InsideShape(Shape shape, const Rect& rect, int corner, int x, int y)
+{
+	if (rect.IsEmpty() || x < rect.left || x >= rect.right || y < rect.top
+		|| y >= rect.bottom)
+		return false;
+
+	switch (shape) {
+		case Shape::Rect:
+			return true;
+		case Shape::Oval:
+			return InsideEllipse(rect, x, y);
+		case Shape::RoundRect:
+		{
+			int cornerWidth = std::min(corner, rect.Width());
+			int cornerHeight = std::min(corner, rect.Height());
+			if (cornerWidth <= 0 || cornerHeight <= 0)
+				return true;
+
+			bool left = x < rect.left + cornerWidth / 2;
+			bool right = x >= rect.right - cornerWidth / 2;
+			bool top = y < rect.top + cornerHeight / 2;
+			bool bottom = y >= rect.bottom - cornerHeight / 2;
+			if (!(left || right) || !(top || bottom))
+				return true;
+
+			// In one of the four corners: test against that corner's oval.
+			int cornerLeft = left ? rect.left : rect.right - cornerWidth;
+			int cornerTop = top ? rect.top : rect.bottom - cornerHeight;
+			return InsideEllipse({cornerLeft, cornerTop,
+				cornerLeft + cornerWidth, cornerTop + cornerHeight}, x, y);
+		}
+	}
+	return false;
+}
+
+
+// Floor division, also for negative numerators.
+static long
+FloorDiv(long numerator, long denominator)
+{
+	long quotient = numerator / denominator;
+	if (numerator % denominator != 0 && (numerator < 0) != (denominator < 0))
+		quotient--;
+	return quotient;
+}
+
+
+Rect
+Canvas::_Clip(const Rect& rect) const
+{
+	return {std::max(rect.left, 0), std::max(rect.top, 0),
+		std::min(rect.right, fWidth), std::min(rect.bottom, fHeight)};
+}
+
+
+void
+Canvas::FillShape(Shape shape, const Rect& rect, const Pattern& pattern)
+{
+	Rect clip = _Clip(rect);
+	for (int y = clip.top; y < clip.bottom; y++) {
+		for (int x = clip.left; x < clip.right; x++) {
+			if (InsideShape(shape, rect, kRoundRectCorner, x, y))
+				fPixels[_Index(x, y)] = pattern.Bit(x, y) ? 1 : 0;
+		}
+	}
+}
+
+
+void
+Canvas::FrameShape(Shape shape, const Rect& rect, int penSize,
+	const Pattern& pattern)
+{
+	// As in QuickDraw, the inner shape's corners shrink with the pen.
+	Rect inner = rect.InsetBy(penSize, penSize);
+	int innerCorner = std::max(0, kRoundRectCorner - 2 * penSize);
+
+	Rect clip = _Clip(rect);
+	for (int y = clip.top; y < clip.bottom; y++) {
+		for (int x = clip.left; x < clip.right; x++) {
+			if (InsideShape(shape, rect, kRoundRectCorner, x, y)
+				&& !InsideShape(shape, inner, innerCorner, x, y))
+				fPixels[_Index(x, y)] = pattern.Bit(x, y) ? 1 : 0;
+		}
+	}
+}
+
+
+void
+Canvas::FillPolygon(const std::vector<Point>& points, const Pattern& pattern)
+{
+	if (points.size() < 3)
+		return;
+
+	int top = points[0].y;
+	int bottom = points[0].y;
+	for (const Point& point : points) {
+		top = std::min(top, point.y);
+		bottom = std::max(bottom, point.y);
+	}
+	top = std::max(top, 0);
+	bottom = std::min(bottom, fHeight);
+
+	std::vector<double> crossings;
+	for (int y = top; y < bottom; y++) {
+		// Where the scanline through the pixel centers crosses each edge.
+		double center = y + 0.5;
+		crossings.clear();
+		for (size_t i = 0; i < points.size(); i++) {
+			const Point& a = points[i];
+			const Point& b = points[(i + 1) % points.size()];
+			if ((a.y <= center) != (b.y <= center)) {
+				crossings.push_back(a.x
+					+ (center - a.y) * (b.x - a.x) / double(b.y - a.y));
+			}
+		}
+		std::sort(crossings.begin(), crossings.end());
+
+		// Even-odd: fill pixels whose centers lie between pairs.
+		for (size_t i = 0; i + 1 < crossings.size(); i += 2) {
+			int from = std::max(0, (int)std::ceil(crossings[i] - 0.5));
+			int to = std::min(fWidth,
+				(int)std::ceil(crossings[i + 1] - 0.5));
+			for (int x = from; x < to; x++)
+				fPixels[_Index(x, y)] = pattern.Bit(x, y) ? 1 : 0;
+		}
+	}
+}
+
+
+void
+Canvas::StrokePolyline(const std::vector<Point>& points, bool closed,
+	int penSize, const Pattern& pattern)
+{
+	if (points.empty())
+		return;
+	if (points.size() == 1) {
+		StrokeLine(points[0].x, points[0].y, points[0].x, points[0].y,
+			penSize, pattern);
+		return;
+	}
+
+	for (size_t i = 0; i + 1 < points.size(); i++) {
+		StrokeLine(points[i].x, points[i].y, points[i + 1].x,
+			points[i + 1].y, penSize, pattern);
+	}
+	if (closed) {
+		StrokeLine(points.back().x, points.back().y, points[0].x,
+			points[0].y, penSize, pattern);
+	}
+}
+
+
+void
+Canvas::StampMask(const Mask16& mask, int centerX, int centerY,
+	const Pattern& pattern)
+{
+	int left = centerX - 8;
+	int top = centerY - 8;
+	for (int y = 0; y < 16; y++) {
+		for (int x = 0; x < 16; x++) {
+			if (mask.Bit(x, y) && Contains(left + x, top + y)) {
+				fPixels[_Index(left + x, top + y)]
+					= pattern.Bit(left + x, top + y) ? 1 : 0;
+			}
+		}
+	}
+}
+
+
+void
+Canvas::StrokeMask(const Mask16& mask, int x0, int y0, int x1, int y1,
+	const Pattern& pattern)
+{
+	// MacPaint steps in Fixed point from the center of the start pixel and
+	// takes the integer part (HiWord) of each step.
+	long dx = x1 - x0;
+	long dy = y1 - y0;
+	long steps = std::max(std::labs(dx), std::labs(dy));
+	for (long step = 1; step <= steps; step++) {
+		int x = (int)FloorDiv(2 * x0 * steps + steps + 2 * dx * step,
+			2 * steps);
+		int y = (int)FloorDiv(2 * y0 * steps + steps + 2 * dy * step,
+			2 * steps);
+		StampMask(mask, x, y, pattern);
+	}
+}
+
+
+void
+Canvas::CopyRect(const Canvas& source, Rect rect)
+{
+	if (source.fWidth != fWidth || source.fHeight != fHeight)
+		return;
+
+	Rect clip = _Clip(rect);
+	if (clip.IsEmpty())
+		return;
+	for (int y = clip.top; y < clip.bottom; y++) {
+		std::memcpy(&fPixels[_Index(clip.left, y)],
+			&source.fPixels[_Index(clip.left, y)], clip.Width());
+	}
 }
 
 

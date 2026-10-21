@@ -154,10 +154,10 @@ TestEraserStroke()
 static void
 TestPatternsAreDistinct()
 {
-	CHECK(std::memcmp(&hp::kPatterns[0], &hp::kWhitePattern,
-		sizeof(hp::Pattern)) == 0);
 	CHECK(std::memcmp(&hp::kPatterns[hp::kDefaultPatternIndex],
 		&hp::kBlackPattern, sizeof(hp::Pattern)) == 0);
+	CHECK(std::memcmp(&hp::kPatterns[hp::kWhitePatternIndex],
+		&hp::kWhitePattern, sizeof(hp::Pattern)) == 0);
 
 	// Also catches a short initializer list: missing entries would be
 	// zero-filled and duplicate white.
@@ -174,6 +174,169 @@ TestPatternsAreDistinct()
 }
 
 
+static void
+TestFillAndFrameRect()
+{
+	hp::Canvas canvas(40, 40);
+	// Exclusive right and bottom, as in QuickDraw.
+	canvas.FillShape(hp::Shape::Rect, {10, 10, 20, 15}, hp::kBlackPattern);
+	CHECK(CountBlack(canvas) == 10 * 5);
+	CHECK(canvas.Get(19, 14) && !canvas.Get(20, 14) && !canvas.Get(19, 15));
+
+	// A 2 pixel frame stays inside the rect.
+	canvas.Clear();
+	canvas.FrameShape(hp::Shape::Rect, {10, 10, 20, 20}, 2,
+		hp::kBlackPattern);
+	CHECK(CountBlack(canvas) == 10 * 10 - 6 * 6);
+	CHECK(canvas.Get(10, 10) && canvas.Get(11, 11) && !canvas.Get(12, 12));
+	CHECK(canvas.Get(19, 19) && !canvas.Get(20, 20));
+
+	// A pen wider than half the rect fills it.
+	canvas.Clear();
+	canvas.FrameShape(hp::Shape::Rect, {0, 0, 6, 6}, 4, hp::kBlackPattern);
+	CHECK(CountBlack(canvas) == 36);
+}
+
+
+static void
+TestOvalAndRoundRect()
+{
+	hp::Canvas canvas(60, 60);
+	canvas.FillShape(hp::Shape::Oval, {0, 0, 40, 20}, hp::kBlackPattern);
+	// Center filled, corners empty, extremes of the axes reached.
+	CHECK(canvas.Get(20, 10) && !canvas.Get(0, 0) && !canvas.Get(39, 19));
+	CHECK(canvas.Get(0, 10) && canvas.Get(39, 9) && canvas.Get(20, 0));
+	// Symmetric left/right and top/bottom.
+	bool symmetric = true;
+	for (int y = 0; y < 20; y++) {
+		for (int x = 0; x < 40; x++) {
+			if (canvas.Get(x, y) != canvas.Get(39 - x, y)
+				|| canvas.Get(x, y) != canvas.Get(x, 19 - y))
+				symmetric = false;
+		}
+	}
+	CHECK(symmetric);
+	// Roughly pi * a * b.
+	int area = CountBlack(canvas);
+	CHECK(area > 600 && area < 660);
+
+	// A hollow oval is a ring: the center stays white.
+	canvas.Clear();
+	canvas.FrameShape(hp::Shape::Oval, {0, 0, 40, 40}, 1, hp::kBlackPattern);
+	CHECK(!canvas.Get(20, 20) && canvas.Get(0, 20) && canvas.Get(20, 39));
+
+	// Round rect: square-cornered in the middle of each edge, rounded at
+	// the corners.
+	canvas.Clear();
+	canvas.FillShape(hp::Shape::RoundRect, {0, 0, 50, 50},
+		hp::kBlackPattern);
+	CHECK(!canvas.Get(0, 0) && !canvas.Get(49, 49));
+	CHECK(canvas.Get(25, 0) && canvas.Get(0, 25) && canvas.Get(49, 25));
+	CHECK(canvas.Get(9, 0) && canvas.Get(4, 4));
+}
+
+
+static void
+TestFillPolygon()
+{
+	hp::Canvas canvas(30, 30);
+	// A square given as a polygon covers the same pixels as the rect.
+	canvas.FillPolygon({{5, 5}, {15, 5}, {15, 15}, {5, 15}},
+		hp::kBlackPattern);
+	CHECK(CountBlack(canvas) == 100);
+	CHECK(canvas.Get(5, 5) && canvas.Get(14, 14) && !canvas.Get(15, 15));
+
+	// A right triangle covers about half a square.
+	canvas.Clear();
+	canvas.FillPolygon({{0, 0}, {20, 0}, {0, 20}}, hp::kBlackPattern);
+	int area = CountBlack(canvas);
+	CHECK(area >= 190 && area <= 210);
+	CHECK(canvas.Get(1, 1) && !canvas.Get(18, 18));
+
+	// Fewer than three points: nothing.
+	canvas.Clear();
+	canvas.FillPolygon({{0, 0}, {10, 10}}, hp::kBlackPattern);
+	CHECK(CountBlack(canvas) == 0);
+}
+
+
+static void
+TestStampAndStrokeMask()
+{
+	hp::Mask16 dot = {};
+	dot.rows[8] = 0x0080;	// a single pixel at (8, 8)
+	hp::Canvas canvas(40, 40);
+	canvas.StampMask(dot, 20, 20, hp::kBlackPattern);
+	CHECK(CountBlack(canvas) == 1 && canvas.Get(20, 20));
+
+	// Only masked pixels change: stamping white leaves the rest black.
+	hp::Mask16 full;
+	for (uint16_t& row : full.rows)
+		row = 0xffff;
+	canvas.FillRect(0, 0, 39, 39, hp::kBlackPattern);
+	canvas.StampMask(dot, 5, 5, hp::kWhitePattern);
+	CHECK(CountBlack(canvas) == 40 * 40 - 1 && !canvas.Get(5, 5));
+	canvas.StampMask(full, 20, 20, hp::kWhitePattern);
+	CHECK(!canvas.Get(12, 12) && !canvas.Get(27, 27));
+	CHECK(canvas.Get(11, 11) && canvas.Get(28, 28));
+
+	// Clipped at the edges.
+	canvas.Clear();
+	canvas.StampMask(full, 0, 0, hp::kBlackPattern);
+	CHECK(CountBlack(canvas) == 8 * 8);
+
+	// A stroke stamps each step after the start: a horizontal stroke of
+	// a single-pixel mask from x 10 to 20 sets x 11..20.
+	canvas.Clear();
+	canvas.StrokeMask(dot, 10, 30, 20, 30, hp::kBlackPattern);
+	CHECK(CountBlack(canvas) == 10 && !canvas.Get(10, 30)
+		&& canvas.Get(20, 30));
+	canvas.Clear();
+	canvas.StrokeMask(dot, 20, 10, 10, 0, hp::kBlackPattern);
+	CHECK(CountBlack(canvas) == 10 && canvas.Get(10, 0)
+		&& canvas.Get(15, 5));
+}
+
+
+static void
+TestCopyRect()
+{
+	hp::Canvas snapshot(20, 20);
+	snapshot.FillRect(0, 0, 19, 19, hp::kBlackPattern);
+	hp::Canvas canvas(20, 20);
+	canvas.CopyRect(snapshot, {5, 5, 10, 8});
+	CHECK(CountBlack(canvas) == 5 * 3);
+	canvas.CopyRect(snapshot, {-5, -5, 100, 100});
+	CHECK(CountBlack(canvas) == 400);
+}
+
+
+static void
+TestConstraints()
+{
+	// Square drag.
+	hp::Point p = hp::Constrain({10, 10}, {30, 15}, false);
+	CHECK(p == (hp::Point{15, 15}));
+	p = hp::Constrain({10, 10}, {0, 40}, false);
+	CHECK(p == (hp::Point{0, 20}));
+
+	// With allowHV, mostly-horizontal snaps to horizontal.
+	p = hp::Constrain({10, 10}, {40, 12}, true);
+	CHECK(p == (hp::Point{40, 10}));
+	p = hp::Constrain({10, 10}, {11, 50}, true);
+	CHECK(p == (hp::Point{10, 50}));
+	p = hp::Constrain({10, 10}, {20, 18}, true);
+	CHECK(p == (hp::Point{18, 18}));
+
+	// AxisLock waits until the stroke has moved more than a pixel, then
+	// locks to that axis.
+	hp::AxisLock lock({10, 10});
+	CHECK(lock.Apply({11, 11}) == (hp::Point{10, 10}));
+	CHECK(lock.Apply({15, 12}) == (hp::Point{15, 10}));
+	CHECK(lock.Apply({15, 40}) == (hp::Point{15, 10}));
+}
+
+
 int
 main()
 {
@@ -186,6 +349,12 @@ main()
 	TestStrokeLineSquarePen();
 	TestEraserStroke();
 	TestPatternsAreDistinct();
+	TestFillAndFrameRect();
+	TestOvalAndRoundRect();
+	TestFillPolygon();
+	TestStampAndStrokeMask();
+	TestCopyRect();
+	TestConstraints();
 
 	if (sFailures != 0) {
 		std::fprintf(stderr, "%d check(s) failed\n", sFailures);

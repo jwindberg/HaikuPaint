@@ -3,14 +3,12 @@
 
 #include <View.h>
 
-#include <vector>
-
 
 class BBitmap;
 
 
-// The current pattern in a large swatch, then a two-row grid of all
-// hp::kPatterns. Posts kMsgSetPattern to the window.
+// MacPaint's pattern palette: a sample of the current pattern, then
+// hp::kPatterns in two rows of 19. Posts kMsgSetPattern to the window.
 class PatternPalette : public BView {
 public:
 								PatternPalette();
@@ -22,11 +20,9 @@ public:
 			void				SetPatternIndex(int index);
 
 private:
-			BRect				_CurrentFrame() const;
-			BRect				_CellFrame(int index) const;
+			void				_Render();
 
-			std::vector<BBitmap*> fSwatches;
-			BBitmap*			fCurrentSwatch;
+			BBitmap*			fBitmap;
 			int					fIndex;
 };
 

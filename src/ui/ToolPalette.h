@@ -3,17 +3,16 @@
 
 #include <View.h>
 
-#include <vector>
-
 #include "Messages.h"
 
 
 class BBitmap;
 
 
-// MacPaint-style grid of tool icons; the selected tool is shown inverted.
-// Posts kMsgSetTool to the window. Double-clicking the eraser posts
-// kMsgClear, as in MacPaint.
+// MacPaint's tool palette: 20 icons from PaintFont in two columns, with the
+// selected tool inverted. Only tools HaikuPaint implements respond to
+// clicks. Posts kMsgSetTool to the window; double-clicking the eraser posts
+// kMsgClear and double-clicking the brush kMsgChooseBrush, as in MacPaint.
 class ToolPalette : public BView {
 public:
 								ToolPalette();
@@ -25,10 +24,9 @@ public:
 			void				SetTool(Tool tool);
 
 private:
-			BRect				_CellFrame(int index) const;
+			void				_Render();
 
-			std::vector<BBitmap*> fIcons;
-			std::vector<BBitmap*> fSelectedIcons;
+			BBitmap*			fBitmap;
 			Tool				fTool;
 };
 

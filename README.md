@@ -46,3 +46,12 @@ runs there too.
      on the Mac.
 3. GUI apps can't be displayed over SSH, so always launch HaikuPaint on the
    Haiku desktop.
+
+## Credits
+MacPaint was written by Bill Atkinson at Apple (1984). HaikuPaint's code is
+new, but its patterns (the System file's `PAT# 0`) and its tool icons and
+cursors (MacPaint's PaintFont) are MacPaint's original 1984 artwork,
+© Apple. `tools/extract_macpaint_art.py` regenerates
+`src/engine/Patterns.cpp` and `src/ui/PaintFont.cpp` from a MacPaint 1.x
+floppy image. Behavior and layout were studied in the MacPaint source code
+released by the Computer History Museum, which isn't included here.

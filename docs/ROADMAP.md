@@ -12,18 +12,23 @@ Keep each milestone shippable. Engine work comes with tests in
 - [x] Tool palette view (a grid of icon buttons, left side)
 - [x] Pattern palette with 38 patterns (bottom); the paint bucket uses the
       selected pattern
-- [ ] Replace HaikuPaint's own pattern set (`src/engine/Patterns.cpp`) with
-      the original 38, worked out from the CHM source or an emulator
+- [x] Original artwork: patterns (System PAT# 0) and PaintFont icons and
+      cursors, extracted by `tools/extract_macpaint_art.py`; palettes follow
+      MacPaint's geometry
 - [x] Line width selector (the line tool uses it)
 - [x] Eraser; double-clicking the eraser clears the page
 
-## M2: Shapes and brushes
-- [ ] Engine: thick lines, rectangles, ovals and rounded rectangles, hollow
+## M2: Shapes and brushes (done, pending testing on Haiku)
+- [x] Engine: thick lines, rectangles, ovals and rounded rectangles, hollow
       and filled with a pattern
-- [ ] Rubber-band previews for all shape tools; Shift constraints
-- [ ] "No border" entry at the top of the line width palette (shapes only)
-- [ ] Paintbrush with brush shapes; spray can
-- [ ] Polygon and freeform shapes
+- [x] Exact live previews (snapshot and redraw, like MacPaint's alternate
+      buffer); Shift constraints for shapes, lines, polygon edges, the pencil
+      and the brushes
+- [x] "No border" entry at the top of the line width palette (shapes only)
+- [x] Paintbrush with MacPaint's 32 brush shapes (double-click the brush);
+      spray can
+- [x] Polygon and freeform shapes, hollow and filled
+- [ ] Option key: draw borders and lines in the current pattern (JamLine)
 
 ## M3: Undo, files
 - [ ] One-level undo (snapshot of the canvas before each operation)

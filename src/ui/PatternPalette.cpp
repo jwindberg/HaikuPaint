@@ -8,72 +8,58 @@
 #include "Patterns.h"
 
 
-static const int kRows = 2;
-static const int kColumns = (hp::kPatternCount + kRows - 1) / kRows;
-// Cells share borders: each frame is kCellSize + 1 pixels, with a
-// kCellSize - 1 pixel swatch inside.
-static const int kCellSize = 17;
-static const int kSwatchSize = kCellSize - 1;
-static const int kCurrentSwatchSize = kRows * kCellSize - 1;
-static const float kMargin = 4;
-static const float kGap = 8;
+// MacPaint.p's patLeft/Right/Top/Bottom/Mid, patSpace, patRow and patStart,
+// relative to the palette.
+static const int kWidth = 423;
+static const int kHeight = 35;
+static const int kMid = 17;
+static const int kSpace = 20;
+static const int kPerRow = 19;
+static const int kStart = 43;
+
+static_assert(2 * kPerRow == hp::kPatternCount, "two rows of patterns");
 
 
 PatternPalette::PatternPalette()
 	:
 	BView("patterns", B_WILL_DRAW),
-	fCurrentSwatch(NULL),
-	fIndex(-1)
+	fBitmap(NULL),
+	fIndex(hp::kDefaultPatternIndex)
 {
-	for (int i = 0; i < hp::kPatternCount; i++)
-		fSwatches.push_back(NewPatternBitmap(hp::kPatterns[i], kSwatchSize));
-	SetPatternIndex(hp::kDefaultPatternIndex);
-
-	float width = _CellFrame(hp::kPatternCount - 1).right + kMargin;
-	float height = kRows * kCellSize + 2 * kMargin;
-	SetExplicitMinSize(BSize(width, height));
-	SetExplicitMaxSize(BSize(B_SIZE_UNLIMITED, height));
+	BSize size(kWidth, kHeight);
+	SetExplicitMinSize(size);
+	SetExplicitMaxSize(size);
 	SetViewUIColor(B_PANEL_BACKGROUND_COLOR);
+	_Render();
 }
 
 
 PatternPalette::~PatternPalette()
 {
-	for (BBitmap* swatch : fSwatches)
-		delete swatch;
-	delete fCurrentSwatch;
+	delete fBitmap;
 }
 
 
 void
 PatternPalette::Draw(BRect updateRect)
 {
-	SetHighColor(0, 0, 0);
-
-	BRect current = _CurrentFrame();
-	StrokeRect(current);
-	DrawBitmap(fCurrentSwatch, BPoint(current.left + 1, current.top + 1));
-
-	for (int i = 0; i < hp::kPatternCount; i++) {
-		BRect frame = _CellFrame(i);
-		StrokeRect(frame);
-		DrawBitmap(fSwatches[i], BPoint(frame.left + 1, frame.top + 1));
-	}
+	DrawBitmap(fBitmap, BPoint(0, 0));
 }
 
 
 void
 PatternPalette::MouseDown(BPoint where)
 {
-	for (int i = 0; i < hp::kPatternCount; i++) {
-		if (!_CellFrame(i).Contains(where))
-			continue;
-
-		BMessage message(kMsgSetPattern);
-		message.AddInt32("index", i);
-		Window()->PostMessage(&message);
+	int x = (int)where.x;
+	int y = (int)where.y;
+	if (x < kStart || x >= kStart + kPerRow * kSpace || y < 1
+		|| y >= kHeight - 1)
 		return;
-	}
+
+	int index = (x - kStart) / kSpace + (y > kMid ? kPerRow : 0);
+	BMessage message(kMsgSetPattern);
+	message.AddInt32("index", index);
+	Window()->PostMessage(&message);
 }
 
 
@@ -83,25 +69,30 @@ PatternPalette::SetPatternIndex(int index)
 	if (index == fIndex || index < 0 || index >= hp::kPatternCount)
 		return;
 	fIndex = index;
-	delete fCurrentSwatch;
-	fCurrentSwatch = NewPatternBitmap(hp::kPatterns[index],
-		kCurrentSwatchSize);
-	Invalidate(_CurrentFrame());
+	_Render();
+	Invalidate();
 }
 
 
-BRect
-PatternPalette::_CurrentFrame() const
+void
+PatternPalette::_Render()
 {
-	return BRect(kMargin, kMargin, kMargin + kRows * kCellSize,
-		kMargin + kRows * kCellSize);
-}
+	// Follows MacPaint's DrawPat.
+	hp::Canvas canvas(kWidth + 1, kHeight + 1);
+	DrawPaletteBox(canvas);
 
+	FrameQDRect(canvas, 8, 6, kStart - 7, kHeight - 6);
+	PaintQDRect(canvas, 9, 7, kStart - 8, kHeight - 7, hp::kPatterns[fIndex]);
 
-BRect
-PatternPalette::_CellFrame(int index) const
-{
-	float left = _CurrentFrame().right + kGap + (index / kRows) * kCellSize;
-	float top = kMargin + (index % kRows) * kCellSize;
-	return BRect(left, top, left + kCellSize, top + kCellSize);
+	PaintQDRect(canvas, kStart - 1, 1, kWidth - 1, kHeight - 1);
+	int h = kStart;
+	for (int i = 0; i < kPerRow; i++) {
+		PaintQDRect(canvas, h, 1, h + kSpace - 1, kMid, hp::kPatterns[i]);
+		PaintQDRect(canvas, h, kMid + 1, h + kSpace - 1, kHeight - 1,
+			hp::kPatterns[i + kPerRow]);
+		h += kSpace;
+	}
+
+	delete fBitmap;
+	fBitmap = NewBitmapFromCanvas(canvas);
 }
