@@ -2,11 +2,13 @@
 // it must build with nothing but a C++17 compiler, on macOS, Linux or Haiku.
 
 #include "Canvas.h"
+#include "MacPaintFile.h"
 #include "Patterns.h"
 
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <random>
 
 
 static int sFailures = 0;
@@ -337,6 +339,104 @@ TestConstraints()
 }
 
 
+static bool
+RoundTrips(const std::vector<uint8_t>& data)
+{
+	std::vector<uint8_t> packed = hp::PackBits(data.data(), data.size());
+	std::vector<uint8_t> unpacked(data.size());
+	size_t position = 0;
+	return hp::UnpackBits(packed.data(), packed.size(), &position,
+			unpacked.data(), unpacked.size())
+		&& position == packed.size() && unpacked == data;
+}
+
+
+static void
+TestPackBits()
+{
+	// MacPaint's BlankDoc writes each blank scanline as -71, 0.
+	std::vector<uint8_t> blank(72, 0);
+	std::vector<uint8_t> packed = hp::PackBits(blank.data(), blank.size());
+	CHECK(packed.size() == 2 && (int8_t)packed[0] == -71 && packed[1] == 0);
+
+	// The classic example from Apple's Technical Note TN1023.
+	const uint8_t sample[] = {0xAA, 0xAA, 0xAA, 0x80, 0x00, 0x2A, 0xAA, 0xAA,
+		0xAA, 0xAA, 0x80, 0x00, 0x2A, 0x22, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA,
+		0xAA, 0xAA, 0xAA, 0xAA};
+	const uint8_t tnPacked[] = {0xFE, 0xAA, 0x02, 0x80, 0x00, 0x2A, 0xFD,
+		0xAA, 0x03, 0x80, 0x00, 0x2A, 0x22, 0xF7, 0xAA};
+	uint8_t out[sizeof(sample)];
+	size_t position = 0;
+	CHECK(hp::UnpackBits(tnPacked, sizeof(tnPacked), &position, out,
+		sizeof(out)));
+	CHECK(std::memcmp(out, sample, sizeof(sample)) == 0);
+	CHECK(RoundTrips(std::vector<uint8_t>(sample, sample + sizeof(sample))));
+
+	// Runs and literals longer than one packet, and random data.
+	CHECK(RoundTrips(std::vector<uint8_t>(300, 0x55)));
+	std::mt19937 random(1984);
+	for (int trial = 0; trial < 200; trial++) {
+		std::vector<uint8_t> data(random() % 400);
+		for (uint8_t& byte : data)
+			byte = random() % 4 == 0 ? 0 : (uint8_t)random();
+		if (!RoundTrips(data)) {
+			std::fprintf(stderr, "PackBits round trip failed, trial %d\n",
+				trial);
+			sFailures++;
+			break;
+		}
+	}
+
+	// Truncated input fails instead of reading past the end.
+	position = 0;
+	CHECK(!hp::UnpackBits(tnPacked, 5, &position, out, sizeof(out)));
+}
+
+
+static void
+TestMacPaintFile()
+{
+	hp::Canvas canvas;
+	canvas.FillShape(hp::Shape::Oval, {100, 100, 300, 250}, hp::kPatterns[3]);
+	canvas.DrawLine(0, 0, 575, 719, true);
+	canvas.Set(575, 0, true);
+
+	std::vector<uint8_t> file = hp::WriteMacPaint(canvas, hp::kPatterns);
+	CHECK(file.size() > 512 && file[3] == 2);
+	CHECK(std::memcmp(&file[4], hp::kPatterns, 38 * 8) == 0);
+
+	hp::Canvas loaded;
+	std::string error;
+	CHECK(hp::ReadMacPaint(file.data(), file.size(), loaded, &error));
+	CHECK(loaded.Pixels() == canvas.Pixels());
+
+	// A blank document is exactly BlankDoc's 512 + 720 * 2 bytes.
+	hp::Canvas blank;
+	CHECK(hp::WriteMacPaint(blank, hp::kPatterns).size() == 512 + 720 * 2);
+
+	// With a MacBinary header in front.
+	std::vector<uint8_t> macBinary(128, 0);
+	macBinary[1] = 5;
+	std::memcpy(&macBinary[2], "Hello", 5);
+	std::memcpy(&macBinary[65], "PNTGMPNT", 8);
+	macBinary.insert(macBinary.end(), file.begin(), file.end());
+	CHECK(hp::MacPaintDataOffset(macBinary.data(), macBinary.size()) == 128);
+	hp::Canvas fromMacBinary;
+	CHECK(hp::ReadMacPaint(macBinary.data(), macBinary.size(), fromMacBinary));
+	CHECK(fromMacBinary.Pixels() == canvas.Pixels());
+	CHECK(hp::MacPaintDataOffset(file.data(), file.size()) == 0);
+
+	// Damaged and foreign files are rejected.
+	hp::Canvas scratch;
+	CHECK(!hp::ReadMacPaint(file.data(), file.size() / 2, scratch, &error));
+	CHECK(!error.empty());
+	CHECK(!hp::ReadMacPaint(file.data(), 100, scratch));
+	std::vector<uint8_t> png = file;
+	std::memcpy(png.data(), "\x89PNG", 4);
+	CHECK(!hp::ReadMacPaint(png.data(), png.size(), scratch));
+}
+
+
 int
 main()
 {
@@ -355,6 +455,8 @@ main()
 	TestStampAndStrokeMask();
 	TestCopyRect();
 	TestConstraints();
+	TestPackBits();
+	TestMacPaintFile();
 
 	if (sFailures != 0) {
 		std::fprintf(stderr, "%d check(s) failed\n", sFailures);

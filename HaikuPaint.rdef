@@ -13,3 +13,7 @@ resource app_version {
 	short_info = "HaikuPaint",
 	long_info = "A MacPaint-style 1-bit paint program for Haiku."
 };
+
+resource file_types message {
+	"types" = "image/x-macpaint"
+};

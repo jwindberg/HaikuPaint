@@ -27,6 +27,7 @@ public:
 	virtual	void				Draw(BRect updateRect);
 	virtual	void				FrameResized(float newWidth, float newHeight);
 	virtual	void				KeyDown(const char* bytes, int32 numBytes);
+	virtual	void				MessageReceived(BMessage* message);
 	virtual	void				MouseDown(BPoint where);
 	virtual	void				MouseMoved(BPoint where, uint32 transit,
 									const BMessage* dragMessage);
@@ -40,10 +41,24 @@ public:
 			int					Brush() const { return fBrush; }
 			void				Clear();
 
+			// MacPaint's one level of undo, which undoing again redoes.
+			bool				CanUndo() const { return fCanUndo; }
+			void				Undo();
+
+			// The document.
+			const hp::Canvas&	Image() const { return fCanvas; }
+			void				SetImage(const hp::Canvas& image);
+			bool				IsDirty() const { return fDirty; }
+			void				SetDirty(bool dirty) { fDirty = dirty; }
+
 private:
-			// Live previews: the canvas is restored from fSnapshot under the
-			// previous preview before each new one is drawn, as MacPaint
-			// does with its alternate buffer.
+			// Called before anything changes the canvas: saves the undo
+			// image and marks the document dirty.
+			void				_BeginOperation();
+
+			// Live previews: the canvas is restored from fUndo (the image
+			// before this operation) under the previous preview before each
+			// new one is drawn, as MacPaint does with its alternate buffer.
 			void				_BeginPreview();
 			void				_RestorePreview();
 			void				_EndPreview(hp::Rect drawn);
@@ -71,7 +86,9 @@ private:
 			hp::Rect			_CanvasBounds() const;
 
 			hp::Canvas			fCanvas;
-			hp::Canvas			fSnapshot;
+			hp::Canvas			fUndo;
+			bool				fCanUndo;
+			bool				fDirty;
 			BBitmap*			fBitmap;
 
 			Tool				fTool;

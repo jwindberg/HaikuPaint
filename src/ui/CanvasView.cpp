@@ -3,11 +3,13 @@
 #include <Bitmap.h>
 #include <Cursor.h>
 #include <InterfaceDefs.h>
+#include <Looper.h>
 #include <ScrollBar.h>
 
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
+#include <utility>
 
 #include "BitmapUtils.h"
 #include "PaintFont.h"
@@ -18,6 +20,8 @@ static const int kEraserSize = 16;
 
 // MacPaint's PolyLine/CreatePoly limit.
 static const size_t kMaxPolygonPoints = 1000;
+
+static const uint32 kMsgUpdateCursor = 'ucrs';
 
 
 static hp::Point
@@ -52,6 +56,8 @@ IsPolygonTool(Tool tool)
 CanvasView::CanvasView()
 	:
 	BView("canvas", B_WILL_DRAW | B_FRAME_EVENTS),
+	fCanUndo(false),
+	fDirty(false),
 	fBitmap(new BBitmap(BRect(0, 0, fCanvas.Width() - 1,
 		fCanvas.Height() - 1), B_RGB32)),
 	fTool(Tool::Pencil),
@@ -104,7 +110,20 @@ CanvasView::AttachedToWindow()
 	SetViewColor(tint_color(ui_color(B_PANEL_BACKGROUND_COLOR),
 		B_DARKEN_2_TINT));
 	_UpdateScrollBars();
-	_UpdateCursor();
+
+	// Setting the cursor now can reach the app_server before this view
+	// does, and be lost; do it once the window is running instead.
+	Looper()->PostMessage(kMsgUpdateCursor, this);
+}
+
+
+void
+CanvasView::MessageReceived(BMessage* message)
+{
+	if (message->what == kMsgUpdateCursor)
+		_UpdateCursor();
+	else
+		BView::MessageReceived(message);
 }
 
 
@@ -150,6 +169,7 @@ CanvasView::MouseDown(BPoint where)
 	// A polygon spans several clicks; vertices are added on mouse up.
 	if (IsPolygonTool(fTool)) {
 		if (!fPolygonActive) {
+			_BeginOperation();
 			_BeginPreview();
 			fPoints.assign(1, point);
 			fPolygonActive = true;
@@ -159,6 +179,7 @@ CanvasView::MouseDown(BPoint where)
 
 	fStart = fLast = point;
 	fAxisLock = hp::AxisLock(point);
+	_BeginOperation();
 
 	switch (fTool) {
 		case Tool::PaintBucket:
@@ -218,6 +239,10 @@ CanvasView::MouseMoved(BPoint where, uint32 transit,
 	const BMessage* dragMessage)
 {
 	hp::Point point = PointOf(where);
+
+	// Belt and braces for the startup case above.
+	if (transit == B_ENTERED_VIEW)
+		_UpdateCursor();
 
 	// The edge being placed follows the pointer, button down or not.
 	if (fPolygonActive) {
@@ -362,17 +387,54 @@ CanvasView::SetBrush(int brush)
 void
 CanvasView::Clear()
 {
-	fPolygonActive = false;
-	fPoints.clear();
+	if (fPolygonActive)
+		_FinishPolygon(false);
+	_BeginOperation();
 	fCanvas.Clear();
 	_CanvasChanged(_CanvasBounds());
 }
 
 
 void
+CanvasView::Undo()
+{
+	if (fPolygonActive)
+		_FinishPolygon(false);
+	if (!fCanUndo)
+		return;
+
+	// Swapping makes the next Undo a redo, as in MacPaint.
+	std::swap(fCanvas, fUndo);
+	fDirty = true;
+	_CanvasChanged(_CanvasBounds());
+}
+
+
+void
+CanvasView::SetImage(const hp::Canvas& image)
+{
+	fPolygonActive = false;
+	fPoints.clear();
+	fTracking = false;
+	fCanvas = image;
+	fCanUndo = false;
+	fDirty = false;
+	_CanvasChanged(_CanvasBounds());
+}
+
+
+void
+CanvasView::_BeginOperation()
+{
+	fUndo = fCanvas;
+	fCanUndo = true;
+	fDirty = true;
+}
+
+
+void
 CanvasView::_BeginPreview()
 {
-	fSnapshot = fCanvas;
 	fPreviewRect = {0, 0, 0, 0};
 }
 
@@ -380,7 +442,7 @@ CanvasView::_BeginPreview()
 void
 CanvasView::_RestorePreview()
 {
-	fCanvas.CopyRect(fSnapshot, fPreviewRect);
+	fCanvas.CopyRect(fUndo, fPreviewRect);
 }
 
 

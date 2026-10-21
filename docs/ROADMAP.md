@@ -30,10 +30,17 @@ Keep each milestone shippable. Engine work comes with tests in
 - [x] Polygon and freeform shapes, hollow and filled
 - [ ] Option key: draw borders and lines in the current pattern (JamLine)
 
-## M3: Undo, files
-- [ ] One-level undo (snapshot of the canvas before each operation)
-- [ ] File > New / Open / Save / Save As through the Translation Kit
-- [ ] Native MIME type, document icon, "unsaved changes" prompt on quit
+## M3: Undo, files (done, pending testing on Haiku)
+- [x] One-level undo that toggles, like MacPaint's (Edit > Undo, Alt+Z)
+- [x] MacPaint documents as the native format (`src/engine/MacPaintFile`):
+      PackBits, version 2 header with patterns, MacBinary on open
+- [x] File > New / Open / Save / Save As; Open converts anything a
+      translator reads to black and white; File > Export as PNG
+- [x] MIME type image/x-macpaint (.mac, .pntg, .pnt), "unsaved changes"
+      prompt for New, Open and Quit
+- [ ] Document icon (HVIF) for MacPaint files
+- [ ] Use the patterns saved in a document (needs pattern editing)
+- [ ] Dither instead of threshold when converting color images
 
 ## M4: Selections
 - [ ] Marquee: select, move, Option-drag to copy, Delete to clear
@@ -48,6 +55,5 @@ Keep each milestone shippable. Engine work comes with tests in
 - [ ] Brush mirrors
 
 ## Later
-- [ ] Import MacPaint files (PackBits)
 - [ ] Localization (Haiku's Locale Kit)
 - [ ] Package as an .hpkg, submit to HaikuPorts
