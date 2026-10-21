@@ -7,28 +7,40 @@
 #include <ScrollView.h>
 
 #include "CanvasView.h"
-
-
-enum {
-	kMsgClear			= 'clr ',
-	kMsgToolPencil		= 'tpen',
-	kMsgToolLine		= 'tlin',
-	kMsgToolPaintBucket	= 'tbkt'
-};
+#include "LineWidthPalette.h"
+#include "Messages.h"
+#include "PatternPalette.h"
+#include "Patterns.h"
+#include "ToolPalette.h"
 
 
 MainWindow::MainWindow()
 	:
-	BWindow(BRect(100, 100, 700, 600), "HaikuPaint", B_TITLED_WINDOW,
-		B_ASYNCHRONOUS_CONTROLS | B_QUIT_ON_WINDOW_CLOSE)
+	BWindow(BRect(100, 100, 750, 650), "HaikuPaint", B_TITLED_WINDOW,
+		B_ASYNCHRONOUS_CONTROLS | B_QUIT_ON_WINDOW_CLOSE
+			| B_AUTO_UPDATE_SIZE_LIMITS)
 {
 	fCanvasView = new CanvasView();
+	fCanvasView->SetPattern(hp::kPatterns[hp::kDefaultPatternIndex]);
 	BScrollView* scrollView = new BScrollView("scroller", fCanvasView, 0,
 		true, true, B_NO_BORDER);
 
+	fToolPalette = new ToolPalette();
+	fLineWidthPalette = new LineWidthPalette();
+	fPatternPalette = new PatternPalette();
+
 	BLayoutBuilder::Group<>(this, B_VERTICAL, 0)
 		.Add(_BuildMenuBar())
-		.Add(scrollView);
+		.AddGroup(B_HORIZONTAL, 0)
+			.AddGroup(B_VERTICAL, B_USE_SMALL_SPACING)
+				.SetInsets(B_USE_SMALL_SPACING)
+				.Add(fToolPalette)
+				.Add(fLineWidthPalette)
+				.AddGlue()
+			.End()
+			.Add(scrollView)
+		.End()
+		.Add(fPatternPalette);
 }
 
 
@@ -39,15 +51,38 @@ MainWindow::MessageReceived(BMessage* message)
 		case kMsgClear:
 			fCanvasView->Clear();
 			break;
-		case kMsgToolPencil:
-			fCanvasView->SetTool(Tool::Pencil);
+
+		case kMsgSetTool:
+		{
+			int32 tool;
+			if (message->FindInt32("tool", &tool) == B_OK) {
+				fCanvasView->SetTool((Tool)tool);
+				fToolPalette->SetTool((Tool)tool);
+			}
 			break;
-		case kMsgToolLine:
-			fCanvasView->SetTool(Tool::Line);
+		}
+
+		case kMsgSetPattern:
+		{
+			int32 index;
+			if (message->FindInt32("index", &index) == B_OK
+				&& index >= 0 && index < hp::kPatternCount) {
+				fCanvasView->SetPattern(hp::kPatterns[index]);
+				fPatternPalette->SetPatternIndex(index);
+			}
 			break;
-		case kMsgToolPaintBucket:
-			fCanvasView->SetTool(Tool::PaintBucket);
+		}
+
+		case kMsgSetLineWidth:
+		{
+			int32 width;
+			if (message->FindInt32("width", &width) == B_OK) {
+				fCanvasView->SetLineWidth(width);
+				fLineWidthPalette->SetLineWidth(width);
+			}
 			break;
+		}
+
 		default:
 			BWindow::MessageReceived(message);
 			break;
@@ -68,18 +103,6 @@ MainWindow::_BuildMenuBar()
 	BMenu* editMenu = new BMenu("Edit");
 	editMenu->AddItem(new BMenuItem("Clear", new BMessage(kMsgClear)));
 	menuBar->AddItem(editMenu);
-
-	// Temporary until there is a real tool palette (see docs/ROADMAP.md).
-	BMenu* toolMenu = new BMenu("Tools");
-	toolMenu->SetRadioMode(true);
-	BMenuItem* pencilItem = new BMenuItem("Pencil",
-		new BMessage(kMsgToolPencil), '1');
-	pencilItem->SetMarked(true);
-	toolMenu->AddItem(pencilItem);
-	toolMenu->AddItem(new BMenuItem("Line", new BMessage(kMsgToolLine), '2'));
-	toolMenu->AddItem(new BMenuItem("Paint bucket",
-		new BMessage(kMsgToolPaintBucket), '3'));
-	menuBar->AddItem(toolMenu);
 
 	return menuBar;
 }

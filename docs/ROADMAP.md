@@ -8,17 +8,20 @@ Keep each milestone shippable. Engine work comes with tests in
 - [x] Haiku app: window, menus, scrollable canvas
 - [x] Tools (from a menu): pencil, line, paint bucket
 
-## M1: Palettes
-- [ ] Tool palette view (a grid of icon buttons, left side)
-- [ ] Pattern palette with the 38 original patterns (bottom); the paint
-      bucket uses the selected pattern
-- [ ] Line width selector
-- [ ] Eraser; double-clicking the eraser clears the page
+## M1: Palettes (done)
+- [x] Tool palette view (a grid of icon buttons, left side)
+- [x] Pattern palette with 38 patterns (bottom); the paint bucket uses the
+      selected pattern
+- [ ] Replace HaikuPaint's own pattern set (`src/engine/Patterns.cpp`) with
+      the original 38, worked out from the CHM source or an emulator
+- [x] Line width selector (the line tool uses it)
+- [x] Eraser; double-clicking the eraser clears the page
 
 ## M2: Shapes and brushes
 - [ ] Engine: thick lines, rectangles, ovals and rounded rectangles, hollow
       and filled with a pattern
 - [ ] Rubber-band previews for all shape tools; Shift constraints
+- [ ] "No border" entry at the top of the line width palette (shapes only)
 - [ ] Paintbrush with brush shapes; spray can
 - [ ] Polygon and freeform shapes
 

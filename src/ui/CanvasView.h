@@ -4,16 +4,10 @@
 #include <View.h>
 
 #include "Canvas.h"
+#include "Messages.h"
 
 
 class BBitmap;
-
-
-enum class Tool {
-	Pencil,
-	Line,
-	PaintBucket
-};
 
 
 // Shows an hp::Canvas and turns mouse input into tool operations.
@@ -32,22 +26,33 @@ public:
 									const BMessage* dragMessage);
 	virtual	void				MouseUp(BPoint where);
 
-			void				SetTool(Tool tool) { fTool = tool; }
+			void				SetTool(Tool tool);
+			void				SetPattern(const hp::Pattern& pattern)
+									{ fPattern = pattern; }
+			void				SetLineWidth(int width)
+									{ fLineWidth = width; }
 			void				Clear();
 
 private:
 			void				_CanvasChanged(BRect dirty);
 			void				_SyncBitmap(BRect dirty);
 			void				_UpdateScrollBars();
+			void				_Erase(BPoint from, BPoint to);
+			BRect				_EraserFrame(BPoint where) const;
+			BRect				_LineFrame(BPoint from, BPoint to) const;
 			BRect				_CanvasBounds() const;
 
 			hp::Canvas			fCanvas;
 			BBitmap*			fBitmap;
 			Tool				fTool;
+			hp::Pattern			fPattern;
+			int					fLineWidth;
 			bool				fTracking;
 			bool				fPencilBlack;
 			BPoint				fStart;
 			BPoint				fLast;
+			bool				fShowEraser;
+			BPoint				fEraserWhere;
 };
 
 

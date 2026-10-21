@@ -6,6 +6,9 @@
 
 class BMenuBar;
 class CanvasView;
+class LineWidthPalette;
+class PatternPalette;
+class ToolPalette;
 
 
 class MainWindow : public BWindow {
@@ -18,6 +21,9 @@ private:
 			BMenuBar*			_BuildMenuBar();
 
 			CanvasView*			fCanvasView;
+			ToolPalette*		fToolPalette;
+			LineWidthPalette*	fLineWidthPalette;
+			PatternPalette*		fPatternPalette;
 };
 
 

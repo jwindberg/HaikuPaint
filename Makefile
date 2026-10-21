@@ -8,9 +8,14 @@ APP_MIME_SIG = application/x-vnd.HaikuPaint
 
 SRCS = \
 	src/engine/Canvas.cpp \
+	src/engine/Patterns.cpp \
 	src/ui/App.cpp \
+	src/ui/BitmapUtils.cpp \
 	src/ui/CanvasView.cpp \
-	src/ui/MainWindow.cpp
+	src/ui/LineWidthPalette.cpp \
+	src/ui/MainWindow.cpp \
+	src/ui/PatternPalette.cpp \
+	src/ui/ToolPalette.cpp
 
 RDEFS = HaikuPaint.rdef
 

@@ -50,6 +50,15 @@ public:
 			void				DrawLine(int x0, int y0, int x1, int y1,
 									bool black);
 
+			// Fills the rectangle (inclusive coordinates, in any order).
+			void				FillRect(int x0, int y0, int x1, int y1,
+									const Pattern& pattern);
+
+			// Drags a penSize x penSize square pen along the line. Like a
+			// QuickDraw pen, it hangs down and to the right of each point.
+			void				StrokeLine(int x0, int y0, int x1, int y1,
+									int penSize, const Pattern& pattern);
+
 			// Fills the 4-connected region of same-colored pixels containing
 			// (x, y). The pattern is aligned to canvas coordinates, as in
 			// MacPaint, so adjacent fills line up seamlessly.

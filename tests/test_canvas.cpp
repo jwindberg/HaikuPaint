@@ -2,9 +2,11 @@
 // it must build with nothing but a C++17 compiler, on macOS, Linux or Haiku.
 
 #include "Canvas.h"
+#include "Patterns.h"
 
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 
 
 static int sFailures = 0;
@@ -101,6 +103,77 @@ TestFloodFillWithPatternTerminates()
 }
 
 
+static void
+TestFillRect()
+{
+	hp::Canvas canvas(20, 20);
+	// Corners in any order, inclusive.
+	canvas.FillRect(5, 6, 2, 3, hp::kBlackPattern);
+	CHECK(CountBlack(canvas) == 4 * 4);
+	CHECK(canvas.Get(2, 3) && canvas.Get(5, 6) && !canvas.Get(6, 6));
+
+	// Clipped at the edges.
+	canvas.Clear();
+	canvas.FillRect(-10, -10, 1, 1, hp::kBlackPattern);
+	CHECK(CountBlack(canvas) == 4);
+}
+
+
+static void
+TestStrokeLineSquarePen()
+{
+	hp::Canvas canvas(40, 40);
+	// A 3x3 pen hangs down-right: a horizontal stroke from x 10 to 19
+	// covers x 10..21, y 5..7.
+	canvas.StrokeLine(10, 5, 19, 5, 3, hp::kBlackPattern);
+	CHECK(CountBlack(canvas) == 12 * 3);
+	CHECK(canvas.Get(10, 5) && canvas.Get(21, 7));
+	CHECK(!canvas.Get(9, 5) && !canvas.Get(10, 8));
+
+	// Pen size 1 matches DrawLine.
+	hp::Canvas thin(40, 40);
+	thin.DrawLine(1, 2, 30, 17, true);
+	canvas.Clear();
+	canvas.StrokeLine(1, 2, 30, 17, 1, hp::kBlackPattern);
+	CHECK(canvas.Pixels() == thin.Pixels());
+}
+
+
+static void
+TestEraserStroke()
+{
+	// Erasing is a stroke with the white pattern.
+	hp::Canvas canvas(40, 40);
+	canvas.FillRect(0, 0, 39, 39, hp::kBlackPattern);
+	canvas.StrokeLine(0, 0, 0, 0, 16, hp::kWhitePattern);
+	CHECK(CountBlack(canvas) == 40 * 40 - 16 * 16);
+	CHECK(!canvas.Get(15, 15) && canvas.Get(16, 16));
+}
+
+
+static void
+TestPatternsAreDistinct()
+{
+	CHECK(std::memcmp(&hp::kPatterns[0], &hp::kWhitePattern,
+		sizeof(hp::Pattern)) == 0);
+	CHECK(std::memcmp(&hp::kPatterns[hp::kDefaultPatternIndex],
+		&hp::kBlackPattern, sizeof(hp::Pattern)) == 0);
+
+	// Also catches a short initializer list: missing entries would be
+	// zero-filled and duplicate white.
+	for (int i = 0; i < hp::kPatternCount; i++) {
+		for (int j = i + 1; j < hp::kPatternCount; j++) {
+			if (std::memcmp(&hp::kPatterns[i], &hp::kPatterns[j],
+					sizeof(hp::Pattern)) == 0) {
+				std::fprintf(stderr, "patterns %d and %d are identical\n",
+					i, j);
+				sFailures++;
+			}
+		}
+	}
+}
+
+
 int
 main()
 {
@@ -109,6 +182,10 @@ main()
 	TestLines();
 	TestFloodFillStopsAtBorder();
 	TestFloodFillWithPatternTerminates();
+	TestFillRect();
+	TestStrokeLineSquarePen();
+	TestEraserStroke();
+	TestPatternsAreDistinct();
 
 	if (sFailures != 0) {
 		std::fprintf(stderr, "%d check(s) failed\n", sFailures);

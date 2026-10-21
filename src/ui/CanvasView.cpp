@@ -6,9 +6,10 @@
 #include <algorithm>
 #include <cmath>
 
+#include "BitmapUtils.h"
 
-static const uint32 kBlackPixel = 0xff000000;
-static const uint32 kWhitePixel = 0xffffffff;
+
+static const int kEraserSize = 16;
 
 
 static BRect
@@ -19,14 +20,24 @@ RectFrom(BPoint a, BPoint b)
 }
 
 
+static int
+PixelOf(float coordinate)
+{
+	return (int)floorf(coordinate);
+}
+
+
 CanvasView::CanvasView()
 	:
 	BView("canvas", B_WILL_DRAW | B_FRAME_EVENTS),
 	fBitmap(new BBitmap(BRect(0, 0, fCanvas.Width() - 1,
 		fCanvas.Height() - 1), B_RGB32)),
 	fTool(Tool::Pencil),
+	fPattern(hp::kBlackPattern),
+	fLineWidth(1),
 	fTracking(false),
-	fPencilBlack(true)
+	fPencilBlack(true),
+	fShowEraser(false)
 {
 	_SyncBitmap(_CanvasBounds());
 }
@@ -55,11 +66,21 @@ CanvasView::Draw(BRect updateRect)
 	if (rect.IsValid())
 		DrawBitmap(fBitmap, rect, rect);
 
-	// Rubber band while dragging out a line.
+	SetHighColor(0, 0, 0);
+
+	// Rubber band while dragging out a line. The engine's square pen hangs
+	// down-right of each point, while app_server centers its pen, so shift
+	// the preview to match the final result.
 	if (fTracking && fTool == Tool::Line) {
-		SetHighColor(0, 0, 0);
-		StrokeLine(fStart, fLast);
+		float offset = (fLineWidth - 1) / 2.0f;
+		SetPenSize(fLineWidth);
+		StrokeLine(fStart + BPoint(offset, offset),
+			fLast + BPoint(offset, offset));
+		SetPenSize(1);
 	}
+
+	if (fShowEraser && fTool == Tool::Eraser)
+		StrokeRect(_EraserFrame(fEraserWhere));
 }
 
 
@@ -74,8 +95,8 @@ CanvasView::FrameResized(float newWidth, float newHeight)
 void
 CanvasView::MouseDown(BPoint where)
 {
-	int x = (int)floorf(where.x);
-	int y = (int)floorf(where.y);
+	int x = PixelOf(where.x);
+	int y = PixelOf(where.y);
 
 	switch (fTool) {
 		case Tool::Pencil:
@@ -87,10 +108,12 @@ CanvasView::MouseDown(BPoint where)
 		case Tool::Line:
 			break;
 		case Tool::PaintBucket:
-			// TODO: use the selected pattern once there is a pattern palette.
-			fCanvas.FloodFill(x, y, hp::kBlackPattern);
+			fCanvas.FloodFill(x, y, fPattern);
 			_CanvasChanged(_CanvasBounds());
 			return;
+		case Tool::Eraser:
+			_Erase(where, where);
+			break;
 	}
 
 	SetMouseEventMask(B_POINTER_EVENTS,
@@ -104,22 +127,31 @@ void
 CanvasView::MouseMoved(BPoint where, uint32 transit,
 	const BMessage* dragMessage)
 {
+	if (fTool == Tool::Eraser) {
+		// The eraser outline follows the pointer, even when not drawing.
+		if (fShowEraser)
+			Invalidate(_EraserFrame(fEraserWhere));
+		fShowEraser = transit != B_EXITED_VIEW && transit != B_OUTSIDE_VIEW;
+		fEraserWhere = where;
+		if (fShowEraser)
+			Invalidate(_EraserFrame(where));
+	}
+
 	if (!fTracking)
 		return;
 
 	switch (fTool) {
 		case Tool::Pencil:
-			fCanvas.DrawLine((int)floorf(fLast.x), (int)floorf(fLast.y),
-				(int)floorf(where.x), (int)floorf(where.y), fPencilBlack);
+			fCanvas.DrawLine(PixelOf(fLast.x), PixelOf(fLast.y),
+				PixelOf(where.x), PixelOf(where.y), fPencilBlack);
 			_CanvasChanged(RectFrom(fLast, where));
 			break;
 		case Tool::Line:
-		{
-			BRect dirty = RectFrom(fStart, fLast) | RectFrom(fStart, where);
-			dirty.InsetBy(-1, -1);
-			Invalidate(dirty);
+			Invalidate(_LineFrame(fStart, fLast) | _LineFrame(fStart, where));
 			break;
-		}
+		case Tool::Eraser:
+			_Erase(fLast, where);
+			break;
 		case Tool::PaintBucket:
 			break;
 	}
@@ -134,11 +166,24 @@ CanvasView::MouseUp(BPoint where)
 		return;
 
 	if (fTool == Tool::Line) {
-		fCanvas.DrawLine((int)floorf(fStart.x), (int)floorf(fStart.y),
-			(int)floorf(where.x), (int)floorf(where.y), true);
-		_CanvasChanged(RectFrom(fStart, fLast) | RectFrom(fStart, where));
+		fCanvas.StrokeLine(PixelOf(fStart.x), PixelOf(fStart.y),
+			PixelOf(where.x), PixelOf(where.y), fLineWidth,
+			hp::kBlackPattern);
+		fTracking = false;	// before the redraw, so the rubber band goes away
+		_CanvasChanged(_LineFrame(fStart, fLast) | _LineFrame(fStart, where));
 	}
 	fTracking = false;
+}
+
+
+void
+CanvasView::SetTool(Tool tool)
+{
+	if (fShowEraser && fTool == Tool::Eraser && tool != Tool::Eraser) {
+		fShowEraser = false;
+		Invalidate(_EraserFrame(fEraserWhere));
+	}
+	fTool = tool;
 }
 
 
@@ -147,6 +192,38 @@ CanvasView::Clear()
 {
 	fCanvas.Clear();
 	_CanvasChanged(_CanvasBounds());
+}
+
+
+void
+CanvasView::_Erase(BPoint from, BPoint to)
+{
+	// Center the eraser square on the pointer.
+	int half = kEraserSize / 2;
+	fCanvas.StrokeLine(PixelOf(from.x) - half, PixelOf(from.y) - half,
+		PixelOf(to.x) - half, PixelOf(to.y) - half, kEraserSize,
+		hp::kWhitePattern);
+	_CanvasChanged(_EraserFrame(from) | _EraserFrame(to));
+}
+
+
+BRect
+CanvasView::_EraserFrame(BPoint where) const
+{
+	float left = PixelOf(where.x) - kEraserSize / 2;
+	float top = PixelOf(where.y) - kEraserSize / 2;
+	return BRect(left, top, left + kEraserSize - 1, top + kEraserSize - 1);
+}
+
+
+BRect
+CanvasView::_LineFrame(BPoint from, BPoint to) const
+{
+	BRect frame = RectFrom(from, to);
+	frame.right += fLineWidth;
+	frame.bottom += fLineWidth;
+	frame.InsetBy(-1, -1);
+	return frame;
 }
 
 
@@ -165,17 +242,14 @@ CanvasView::_CanvasChanged(BRect dirty)
 void
 CanvasView::_SyncBitmap(BRect dirty)
 {
-	int left = std::max(0, (int)floorf(dirty.left));
-	int top = std::max(0, (int)floorf(dirty.top));
+	int left = std::max(0, PixelOf(dirty.left));
+	int top = std::max(0, PixelOf(dirty.top));
 	int right = std::min(fCanvas.Width() - 1, (int)ceilf(dirty.right));
 	int bottom = std::min(fCanvas.Height() - 1, (int)ceilf(dirty.bottom));
 
-	uint8* bits = (uint8*)fBitmap->Bits();
-	int32 bytesPerRow = fBitmap->BytesPerRow();
 	for (int y = top; y <= bottom; y++) {
-		uint32* row = (uint32*)(bits + y * bytesPerRow);
 		for (int x = left; x <= right; x++)
-			row[x] = fCanvas.Get(x, y) ? kBlackPixel : kWhitePixel;
+			SetBitmapPixel(fBitmap, x, y, fCanvas.Get(x, y));
 	}
 }
 
