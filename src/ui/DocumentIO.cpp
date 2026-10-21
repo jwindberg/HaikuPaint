@@ -80,34 +80,6 @@ LooksLikeMacPaint(BFile& file, const entry_ref& ref,
 }
 
 
-// Converts a translated image to MacPaint's black and white, top left.
-static status_t
-ImageFromBitmap(const BBitmap* source, hp::Canvas& image)
-{
-	BBitmap rgba(source->Bounds(), B_RGBA32);
-	status_t status = rgba.ImportBits(source);
-	if (status != B_OK)
-		return status;
-
-	image.Clear();
-	int width = std::min((int)source->Bounds().Width() + 1, image.Width());
-	int height = std::min((int)source->Bounds().Height() + 1,
-		image.Height());
-	const uint8* bits = (const uint8*)rgba.Bits();
-	for (int y = 0; y < height; y++) {
-		const uint8* pixel = bits + y * rgba.BytesPerRow();
-		for (int x = 0; x < width; x++, pixel += 4) {
-			// B_RGBA32 is B, G, R, A in memory. Transparent counts as
-			// white; otherwise threshold the luminance.
-			int luminance = (114 * pixel[0] + 587 * pixel[1]
-				+ 299 * pixel[2]) / 1000;
-			image.Set(x, y, pixel[3] >= 128 && luminance < 128);
-		}
-	}
-	return B_OK;
-}
-
-
 status_t
 LoadDocument(const entry_ref& ref, hp::Canvas& image, bool* isMacPaint,
 	BString* error)
@@ -139,7 +111,7 @@ LoadDocument(const entry_ref& ref, hp::Canvas& image, bool* isMacPaint,
 	}
 
 	std::unique_ptr<BBitmap> bitmap(BTranslationUtils::GetBitmap(&ref));
-	if (bitmap && ImageFromBitmap(bitmap.get(), image) == B_OK) {
+	if (bitmap && CanvasFromBitmap(bitmap.get(), image) == B_OK) {
 		*isMacPaint = false;
 		return B_OK;
 	}

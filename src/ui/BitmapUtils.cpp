@@ -33,6 +33,32 @@ NewBitmapFromCanvas(const hp::Canvas& canvas)
 }
 
 
+status_t
+CanvasFromBitmap(const BBitmap* source, hp::Canvas& canvas)
+{
+	BBitmap rgba(source->Bounds(), B_RGBA32);
+	status_t status = rgba.ImportBits(source);
+	if (status != B_OK)
+		return status;
+
+	canvas.Clear();
+	int width = std::min((int)source->Bounds().Width() + 1, canvas.Width());
+	int height = std::min((int)source->Bounds().Height() + 1,
+		canvas.Height());
+	const uint8* bits = (const uint8*)rgba.Bits();
+	for (int y = 0; y < height; y++) {
+		const uint8* pixel = bits + y * rgba.BytesPerRow();
+		for (int x = 0; x < width; x++, pixel += 4) {
+			// B_RGBA32 is B, G, R, A in memory.
+			int luminance = (114 * pixel[0] + 587 * pixel[1]
+				+ 299 * pixel[2]) / 1000;
+			canvas.Set(x, y, pixel[3] >= 128 && luminance < 128);
+		}
+	}
+	return B_OK;
+}
+
+
 void
 DrawGlyph(hp::Canvas& canvas, const Glyph& glyph, int penX, int top,
 	bool invert)

@@ -4,6 +4,7 @@
 #include "Canvas.h"
 #include "MacPaintFile.h"
 #include "Patterns.h"
+#include "Selection.h"
 
 #include <cstdio>
 #include <cstdlib>
@@ -437,6 +438,182 @@ TestMacPaintFile()
 }
 
 
+static void
+TestRectSelection()
+{
+	hp::Canvas page(40, 40);
+	page.FillRect(10, 10, 14, 14, hp::kBlackPattern);
+
+	// Clipped to the page; everything inside is selected, white too.
+	hp::Selection selection = hp::SelectRect(page, {8, 8, 50, 20});
+	CHECK(selection.rect.left == 8 && selection.rect.right == 40);
+	CHECK(!selection.lasso && selection.Contains({30, 15}));
+	CHECK(selection.pixels.Get(2, 2) && !selection.pixels.Get(0, 0));
+
+	// Moving: erase under, then stamp at the new place, opaquely.
+	hp::Canvas moved = page;
+	hp::Selection small = hp::SelectRect(page, {10, 10, 15, 15});
+	hp::EraseUnder(moved, small);
+	CHECK(CountBlack(moved) == 0);
+	small.rect = {20, 20, 25, 25};
+	hp::Stamp(moved, small);
+	CHECK(CountBlack(moved) == 25 && moved.Get(20, 20) && moved.Get(24, 24));
+
+	// Edges of a rect selection are its frame.
+	CHECK(small.Edges().size() == 16);
+
+	CHECK(hp::SelectRect(page, {50, 50, 60, 60}).rect.IsEmpty());
+}
+
+
+static void
+TestLassoShrinksToFit()
+{
+	// A ring with a white hole, a separate dot, on white.
+	hp::Canvas page(60, 60);
+	page.FrameShape(hp::Shape::Rect, {10, 10, 20, 20}, 2, hp::kBlackPattern);
+	page.Set(40, 40, true);
+
+	// A loose loop around the ring only.
+	hp::Selection selection;
+	CHECK(hp::SelectLasso(page, {{2, 2}, {30, 2}, {30, 30}, {2, 30}},
+		&selection));
+	CHECK(selection.lasso);
+	// Shrunk to the ring's bounds.
+	CHECK(selection.rect.left == 10 && selection.rect.top == 10
+		&& selection.rect.right == 20 && selection.rect.bottom == 20);
+	// The enclosed white hole is selected too; the dot outside is not.
+	CHECK(selection.Contains({15, 15}) && selection.Contains({10, 10}));
+	CHECK(!selection.Contains({40, 40}));
+
+	// Moving it is transparent outside the mask: a lasso selection of a
+	// diagonal line doesn't carry white over its neighbors.
+	hp::Canvas diagonal(30, 30);
+	diagonal.DrawLine(0, 0, 9, 9, true);
+	hp::Selection line;
+	CHECK(hp::SelectLasso(diagonal, {{0, 0}, {12, 0}, {12, 12}, {0, 12}},
+		&line));
+	hp::Canvas target(30, 30);
+	target.FillRect(0, 0, 29, 29, hp::kBlackPattern);
+	line.rect = {15, 15, 15 + line.rect.Width(), 15 + line.rect.Height()};
+	hp::Stamp(target, line);
+	CHECK(CountBlack(target) == 30 * 30);
+
+	// A loop around nothing selects nothing; a click isn't a loop.
+	hp::Canvas empty(30, 30);
+	CHECK(!hp::SelectLasso(empty, {{1, 1}, {20, 1}, {20, 20}}, &selection));
+	CHECK(!hp::SelectLasso(page, {{5, 5}}, &selection));
+}
+
+
+static void
+TestSelectionTransforms()
+{
+	// An L shape in a 4 x 3 selection:
+	//   #...
+	//   #...
+	//   ##..
+	hp::Canvas page(20, 20);
+	page.Set(0, 0, true);
+	page.Set(0, 1, true);
+	page.Set(0, 2, true);
+	page.Set(1, 2, true);
+	hp::Selection base = hp::SelectRect(page, {0, 0, 4, 3});
+
+	hp::Selection flipped = base;
+	hp::FlipHorizontal(flipped);
+	CHECK(flipped.pixels.Get(3, 0) && flipped.pixels.Get(2, 2)
+		&& !flipped.pixels.Get(0, 0));
+	hp::FlipVertical(flipped);
+	CHECK(flipped.pixels.Get(3, 2) && flipped.pixels.Get(2, 0));
+
+	// Rotating left: 4 x 3 becomes 3 x 4 around the same center, and the
+	// bottom row (##..) becomes the left column, read upward.
+	hp::Selection rotated = base;
+	hp::RotateLeft(rotated);
+	CHECK(rotated.rect.Width() == 3 && rotated.rect.Height() == 4);
+	CHECK(rotated.pixels.Get(0, 3) && rotated.pixels.Get(1, 3)
+		&& rotated.pixels.Get(2, 3) && rotated.pixels.Get(2, 2));
+	CHECK(!rotated.pixels.Get(0, 0));
+	hp::Selection fourTimes = base;
+	for (int i = 0; i < 4; i++)
+		hp::RotateLeft(fourTimes);
+	CHECK(fourTimes.pixels.Pixels() == base.pixels.Pixels());
+
+	hp::Selection inverted = base;
+	hp::Invert(inverted);
+	CHECK(!inverted.pixels.Get(0, 0) && inverted.pixels.Get(3, 0));
+
+	hp::Selection filled = base;
+	hp::Fill(filled, hp::kBlackPattern);
+	CHECK(CountBlack(filled.pixels) == 12);
+
+	// Stretching doubles each pixel.
+	hp::Selection stretched = hp::Stretched(base, {0, 0, 8, 6});
+	CHECK(stretched.pixels.Get(0, 0) && stretched.pixels.Get(1, 1)
+		&& stretched.pixels.Get(3, 5) && !stretched.pixels.Get(4, 5));
+
+	hp::Rect mapped = hp::MapRect({10, 10, 20, 20}, {0, 0, 10, 10},
+		{0, 0, 20, 40});
+	CHECK(mapped.left == 20 && mapped.top == 40 && mapped.right == 40
+		&& mapped.bottom == 80);
+}
+
+
+static void
+TestTraceEdges()
+{
+	// A 2 x 2 black square in the middle of a rect selection becomes a
+	// ring around where it was.
+	hp::Canvas page(10, 10);
+	page.FillRect(4, 4, 5, 5, hp::kBlackPattern);
+	hp::Selection selection = hp::SelectRect(page, {0, 0, 10, 10});
+	hp::TraceEdges(selection, false);
+	CHECK(!selection.pixels.Get(4, 4) && !selection.pixels.Get(5, 5));
+	CHECK(selection.pixels.Get(3, 4) && selection.pixels.Get(6, 5)
+		&& selection.pixels.Get(4, 3) && selection.pixels.Get(5, 6));
+	CHECK(!selection.pixels.Get(7, 4) && !selection.pixels.Get(2, 4));
+
+	// The shadow version reaches two pixels right and down.
+	hp::Selection shadowed = hp::SelectRect(page, {0, 0, 10, 10});
+	hp::TraceEdges(shadowed, true);
+	CHECK(shadowed.pixels.Get(7, 4) && shadowed.pixels.Get(4, 7));
+	CHECK(!shadowed.pixels.Get(2, 4));
+
+	// A lasso selection grows to make room for the outline.
+	hp::Selection lasso;
+	CHECK(hp::SelectLasso(page, {{1, 1}, {8, 1}, {8, 8}, {1, 8}}, &lasso));
+	CHECK(lasso.rect.Width() == 2);
+	hp::TraceEdges(lasso, false);
+	CHECK(lasso.rect.Width() == 4 && lasso.Contains({3, 4})
+		&& lasso.Contains({6, 5}));
+}
+
+
+static void
+TestSelectionClipboardFormat()
+{
+	hp::Canvas page(30, 30);
+	page.FrameShape(hp::Shape::Oval, {2, 2, 20, 14}, 1, hp::kBlackPattern);
+	hp::Selection selection;
+	CHECK(hp::SelectLasso(page, {{0, 0}, {25, 0}, {25, 20}, {0, 20}},
+		&selection));
+
+	std::vector<uint8_t> data = hp::EncodeSelection(selection);
+	hp::Selection decoded;
+	CHECK(hp::DecodeSelection(data.data(), data.size(), &decoded));
+	CHECK(decoded.lasso && decoded.rect.left == 0
+		&& decoded.rect.Width() == selection.rect.Width()
+		&& decoded.rect.Height() == selection.rect.Height());
+	CHECK(decoded.pixels.Pixels() == selection.pixels.Pixels());
+	CHECK(decoded.mask.Pixels() == selection.mask.Pixels());
+
+	CHECK(!hp::DecodeSelection(data.data(), data.size() - 1, &decoded));
+	data[0] = 'X';
+	CHECK(!hp::DecodeSelection(data.data(), data.size(), &decoded));
+}
+
+
 int
 main()
 {
@@ -457,6 +634,11 @@ main()
 	TestConstraints();
 	TestPackBits();
 	TestMacPaintFile();
+	TestRectSelection();
+	TestLassoShrinksToFit();
+	TestSelectionTransforms();
+	TestTraceEdges();
+	TestSelectionClipboardFormat();
 
 	if (sFailures != 0) {
 		std::fprintf(stderr, "%d check(s) failed\n", sFailures);

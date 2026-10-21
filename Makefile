@@ -10,6 +10,7 @@ SRCS = \
 	src/engine/Canvas.cpp \
 	src/engine/MacPaintFile.cpp \
 	src/engine/Patterns.cpp \
+	src/engine/Selection.cpp \
 	src/ui/App.cpp \
 	src/ui/BitmapUtils.cpp \
 	src/ui/BrushWindow.cpp \

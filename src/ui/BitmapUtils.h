@@ -20,6 +20,11 @@ void		SetBitmapPixel(BBitmap* bitmap, int x, int y, bool black);
 // A B_RGB32 copy of the canvas; the caller owns it.
 BBitmap*	NewBitmapFromCanvas(const hp::Canvas& canvas);
 
+// Converts any bitmap to black and white into the top left of canvas,
+// clearing the rest: transparent counts as white, otherwise the luminance
+// is thresholded. Cropped to the canvas.
+status_t	CanvasFromBitmap(const BBitmap* source, hp::Canvas& canvas);
+
 // Draws a PaintFont glyph with the pen at (penX, top); see PaintFont.h.
 // Like QuickDraw's srcOr, or srcXor when invert is true.
 void		DrawGlyph(hp::Canvas& canvas, const Glyph& glyph, int penX,

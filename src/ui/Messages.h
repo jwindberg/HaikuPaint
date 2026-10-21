@@ -37,8 +37,6 @@ inline bool
 IsToolImplemented(Tool tool)
 {
 	switch (tool) {
-		case Tool::Lasso:
-		case Tool::Select:
 		case Tool::Grabber:
 		case Tool::Text:
 			return false;
@@ -57,7 +55,20 @@ enum {
 	kMsgSetLineWidth	= 'slwd',	// "width" int32 (pixels), "border" bool
 									// (false: MacPaint's "no border")
 	kMsgChooseBrush		= 'cbsh',	// opens the brush shape chooser
-	kMsgSetBrush		= 'sbsh'	// "brush" int32 (0-31, as theBrush)
+	kMsgSetBrush		= 'sbsh',	// "brush" int32 (0-31, as theBrush)
+	kMsgSelectAll		= 'sall'	// also: double-click the marquee
+};
+
+
+// Edit menu operations on the selection.
+enum class SelectionCommand {
+	Invert,
+	Fill,
+	TraceEdges,
+	TraceEdgesShadow,
+	FlipHorizontal,
+	FlipVertical,
+	Rotate
 };
 
 

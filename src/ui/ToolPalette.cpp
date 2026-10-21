@@ -65,12 +65,14 @@ ToolPalette::MouseDown(BPoint where)
 		Window()->PostMessage(kMsgClear);
 		return;
 	}
-	if (clicks >= 2 && tool == Tool::Brush)
-		Window()->PostMessage(kMsgChooseBrush);
-
 	BMessage message(kMsgSetTool);
 	message.AddInt32("tool", (int32)tool);
 	Window()->PostMessage(&message);
+
+	if (clicks >= 2 && tool == Tool::Brush)
+		Window()->PostMessage(kMsgChooseBrush);
+	if (clicks >= 2 && tool == Tool::Select)
+		Window()->PostMessage(kMsgSelectAll);
 }
 
 

@@ -28,7 +28,6 @@ Keep each milestone shippable. Engine work comes with tests in
 - [x] Paintbrush with MacPaint's 32 brush shapes (double-click the brush);
       spray can
 - [x] Polygon and freeform shapes, hollow and filled
-- [ ] Option key: draw borders and lines in the current pattern (JamLine)
 
 ## M3: Undo, files (done, pending testing on Haiku)
 - [x] One-level undo that toggles, like MacPaint's (Edit > Undo, Alt+Z)
@@ -42,11 +41,19 @@ Keep each milestone shippable. Engine work comes with tests in
 - [ ] Use the patterns saved in a document (needs pattern editing)
 - [ ] Dither instead of threshold when converting color images
 
-## M4: Selections
-- [ ] Marquee: select, move, Option-drag to copy, Delete to clear
-- [ ] Clipboard: Cut, Copy and Paste through BClipboard
-- [ ] Lasso with shrink-to-fit (study the reference source)
-- [ ] Edit transforms: Invert, Fill, Flip, Rotate, Trace Edges
+## M4: Selections (done, pending testing on Haiku)
+- [x] Marquee: select, move, Ctrl-drag to copy (MacPaint's Option),
+      Ctrl+Alt-drag to leave a trail, Alt-drag to stretch (Command; Shift
+      keeps the aspect), Backspace to clear; double-click selects the window
+- [x] Lasso with MacPaint's shrink-to-fit (CalcMask), transparent moves
+- [x] Marching ants (GetSelPat) around rects and lasso edges
+- [x] Clipboard: Cut, Copy and Paste; HaikuPaint's own format keeps lasso
+      transparency, an archived BBitmap ("image/bitmap") goes along for
+      other apps, and pasted bitmaps from them are converted
+- [x] Edit transforms: Invert, Fill, Trace Edges (Shift: shadow), Flip
+      horizontal/vertical, Rotate
+- [x] Ctrl draws lines and borders in the current pattern (JamLine)
+- [ ] Command (Alt) as OR mode for painting (JamLine/JamFill's patOr)
 
 ## M5: Goodies
 - [ ] FatBits zoom mode

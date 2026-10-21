@@ -1,6 +1,7 @@
 #include "MainWindow.h"
 
 #include <Alert.h>
+#include <Clipboard.h>
 #include <Directory.h>
 #include <FilePanel.h>
 #include <LayoutBuilder.h>
@@ -27,7 +28,8 @@ enum {
 	kMsgExport			= 'expt',
 	kMsgSaveRequested	= 'svrq',
 	kMsgExportRequested	= 'exrq',
-	kMsgUndo			= 'undo'
+	kMsgUndo			= 'undo',
+	kMsgSelectionCommand = 'scmd'	// "command" int32 (a SelectionCommand)
 };
 
 static const char* kUntitled = "untitled";
@@ -154,6 +156,35 @@ MainWindow::MessageReceived(BMessage* message)
 			fCanvasView->Undo();
 			break;
 
+		case B_CUT:
+			fCanvasView->Cut();
+			break;
+
+		case B_COPY:
+			fCanvasView->Copy();
+			break;
+
+		case B_PASTE:
+			fCanvasView->Paste();
+			break;
+
+		case B_SELECT_ALL:
+		case kMsgSelectAll:
+			fCanvasView->SelectAll();
+			break;
+
+		case kMsgSelectionCommand:
+		{
+			SelectionCommand command
+				= (SelectionCommand)message->GetInt32("command", 0);
+			// As in MacPaint, Shift makes Trace Edges add a shadow.
+			if (command == SelectionCommand::TraceEdges
+				&& (modifiers() & B_SHIFT_KEY) != 0)
+				command = SelectionCommand::TraceEdgesShadow;
+			fCanvasView->ApplyToSelection(command);
+			break;
+		}
+
 		case kMsgClear:
 			fCanvasView->Clear();
 			break;
@@ -217,6 +248,21 @@ void
 MainWindow::MenusBeginning()
 {
 	fUndoItem->SetEnabled(fCanvasView->CanUndo());
+
+	bool selection = fCanvasView->HasSelection();
+	for (BMenuItem* item : fSelectionItems)
+		item->SetEnabled(selection);
+
+	bool canPaste = false;
+	if (be_clipboard->Lock()) {
+		BMessage* clip = be_clipboard->Data();
+		canPaste = clip->HasData("application/x-vnd.HaikuPaint-selection",
+				B_MIME_TYPE)
+			|| clip->HasMessage("image/bitmap");
+		be_clipboard->Unlock();
+	}
+	fPasteItem->SetEnabled(canPaste);
+
 	BWindow::MenusBeginning();
 }
 
@@ -248,11 +294,43 @@ MainWindow::_BuildMenuBar()
 		'Q'));
 	menuBar->AddItem(fileMenu);
 
+	// MacPaint's Edit menu, plus Select all.
 	BMenu* editMenu = new BMenu("Edit");
 	fUndoItem = new BMenuItem("Undo", new BMessage(kMsgUndo), 'Z');
 	editMenu->AddItem(fUndoItem);
 	editMenu->AddSeparatorItem();
+
+	BMenuItem* item = new BMenuItem("Cut", new BMessage(B_CUT), 'X');
+	editMenu->AddItem(item);
+	fSelectionItems.push_back(item);
+	item = new BMenuItem("Copy", new BMessage(B_COPY), 'C');
+	editMenu->AddItem(item);
+	fSelectionItems.push_back(item);
+	fPasteItem = new BMenuItem("Paste", new BMessage(B_PASTE), 'V');
+	editMenu->AddItem(fPasteItem);
 	editMenu->AddItem(new BMenuItem("Clear", new BMessage(kMsgClear)));
+	editMenu->AddItem(new BMenuItem("Select all",
+		new BMessage(B_SELECT_ALL), 'A'));
+	editMenu->AddSeparatorItem();
+
+	struct {
+		const char*			label;
+		SelectionCommand	command;
+	} commands[] = {
+		{"Invert", SelectionCommand::Invert},
+		{"Fill", SelectionCommand::Fill},
+		{"Trace edges", SelectionCommand::TraceEdges},
+		{"Flip horizontal", SelectionCommand::FlipHorizontal},
+		{"Flip vertical", SelectionCommand::FlipVertical},
+		{"Rotate", SelectionCommand::Rotate},
+	};
+	for (const auto& entry : commands) {
+		BMessage* message = new BMessage(kMsgSelectionCommand);
+		message->AddInt32("command", (int32)entry.command);
+		item = new BMenuItem(entry.label, message);
+		editMenu->AddItem(item);
+		fSelectionItems.push_back(item);
+	}
 	menuBar->AddItem(editMenu);
 
 	return menuBar;

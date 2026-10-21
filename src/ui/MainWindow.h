@@ -5,6 +5,8 @@
 #include <String.h>
 #include <Window.h>
 
+#include <vector>
+
 
 class BFilePanel;
 class BMenuBar;
@@ -53,6 +55,8 @@ private:
 			LineWidthPalette*	fLineWidthPalette;
 			PatternPalette*		fPatternPalette;
 			BMenuItem*			fUndoItem;
+			BMenuItem*			fPasteItem;
+			std::vector<BMenuItem*> fSelectionItems;	// need a selection
 
 			BFilePanel*			fOpenPanel;
 			BFilePanel*			fSavePanel;
