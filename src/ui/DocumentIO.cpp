@@ -12,6 +12,7 @@
 #include <TranslatorRoster.h>
 
 #include <algorithm>
+#include <cstring>
 #include <memory>
 #include <string>
 #include <string.h>
@@ -81,9 +82,11 @@ LooksLikeMacPaint(BFile& file, const entry_ref& ref,
 
 
 status_t
-LoadDocument(const entry_ref& ref, hp::Canvas& image, bool* isMacPaint,
-	BString* error)
+LoadDocument(const entry_ref& ref, hp::Canvas& image, hp::Pattern* patterns,
+	bool* isMacPaint, BString* error)
 {
+	std::memcpy(patterns, hp::kPatterns, sizeof(hp::kPatterns));
+
 	BFile file(&ref, B_READ_ONLY);
 	status_t status = file.InitCheck();
 	if (status != B_OK) {
@@ -104,7 +107,8 @@ LoadDocument(const entry_ref& ref, hp::Canvas& image, bool* isMacPaint,
 	bool triedMacPaint = false;
 	if (!data.empty() && LooksLikeMacPaint(file, ref, data)) {
 		triedMacPaint = true;
-		if (hp::ReadMacPaint(data.data(), data.size(), image, &reason)) {
+		if (hp::ReadMacPaint(data.data(), data.size(), image, &reason,
+				patterns)) {
 			*isMacPaint = true;
 			return B_OK;
 		}
@@ -118,7 +122,8 @@ LoadDocument(const entry_ref& ref, hp::Canvas& image, bool* isMacPaint,
 
 	// Files that lost their type and name, e.g. copied off an old disk.
 	if (!triedMacPaint && !data.empty()
-		&& hp::ReadMacPaint(data.data(), data.size(), image, &reason)) {
+		&& hp::ReadMacPaint(data.data(), data.size(), image, &reason,
+				patterns)) {
 		*isMacPaint = true;
 		return B_OK;
 	}
@@ -132,12 +137,13 @@ LoadDocument(const entry_ref& ref, hp::Canvas& image, bool* isMacPaint,
 
 
 status_t
-SaveMacPaint(const BEntry& entry, const hp::Canvas& image, BString* error)
+SaveMacPaint(const BEntry& entry, const hp::Canvas& image,
+	const hp::Pattern* patterns, BString* error)
 {
 	BFile file(&entry, B_WRITE_ONLY | B_CREATE_FILE | B_ERASE_FILE);
 	status_t status = file.InitCheck();
 	if (status == B_OK) {
-		std::vector<uint8_t> data = hp::WriteMacPaint(image, hp::kPatterns);
+		std::vector<uint8_t> data = hp::WriteMacPaint(image, patterns);
 		ssize_t written = file.Write(data.data(), data.size());
 		if (written < 0)
 			status = written;

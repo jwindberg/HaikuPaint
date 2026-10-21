@@ -10,6 +10,7 @@
 #include "Geometry.h"
 #include "Messages.h"
 #include "Selection.h"
+#include "TextRenderer.h"
 
 
 class BBitmap;
@@ -39,6 +40,7 @@ public:
 	virtual	void				MouseMoved(BPoint where, uint32 transit,
 									const BMessage* dragMessage);
 	virtual	void				MouseUp(BPoint where);
+	virtual	void				ScrollTo(BPoint where);
 
 			void				SetTool(Tool tool);
 			void				SetPattern(const hp::Pattern& pattern)
@@ -46,6 +48,27 @@ public:
 			void				SetLineWidth(int width, bool border);
 			void				SetBrush(int brush);
 			int					Brush() const { return fBrush; }
+
+			// The Font, FontSize and Style menus. Text being typed stays
+			// live, as in MacPaint, so a change restyles it.
+			void				SetTextStyle(const TextStyle& style);
+
+			// Goodies > FatBits: 8x magnification, every tool still works.
+			void				SetFatBits(bool fatBits);
+			bool				IsFatBits() const { return fZoom > 1; }
+
+			// The part of the page in view, and Show Page's results: move
+			// the whole drawing on the page, and scroll to a page position.
+			hp::Rect			VisibleRect() const
+									{ return _VisibleBounds(); }
+			void				OffsetPage(int dx, int dy);
+			void				ScrollToPage(hp::Point origin);
+
+			// Goodies > Grid: snaps the tools MacPaint snaps to 8 pixels.
+			void				SetGrid(bool grid) { fGrid = grid; }
+			// Goodies > Brush Mirrors, as an hp::MapSymmetry() byte.
+			void				SetSymmetry(uint8_t symmetry)
+									{ fSymmetry = symmetry; }
 
 			// Clears the selection if there is one, else the whole page.
 			void				Clear();
@@ -101,7 +124,8 @@ private:
 
 			// Selections. While one floats, fCanvas shows it stamped over
 			// fBase, the page underneath.
-			void				_SelectionMouseDown(hp::Point point);
+			void				_SelectionMouseDown(hp::Point point,
+									hp::Point unsnapped);
 			void				_BeginSelectionDrag(hp::Point point);
 			void				_DragSelection(hp::Point point);
 			void				_EndSelectionDrag(hp::Point point);
@@ -112,12 +136,26 @@ private:
 			void				_ClearSelection();
 			bool				_InSelection(hp::Point point) const;
 
+			// The text tool: PlaceCaret, TextChar and UpdateText. Accepting
+			// leaves the text on the page, as it already is.
+			void				_PlaceCaret(hp::Point point);
+			void				_TypeText(const char* bytes, int32 numBytes);
+			void				_RenderText();
+			void				_AcceptText();
+			void				_ShowCaret(bool visible);
+
 			// Overlays: the marching ants and the lasso trail. They're drawn
 			// into fBitmap only, never into the canvas.
 			void				_SetOverlay(std::vector<hp::Point> points,
 									bool ants);
 			void				_AppendOverlay(
 									const std::vector<hp::Point>& points);
+
+			// The mouse point as the current tool sees it: on the grid, for
+			// the tools that use it.
+			hp::Point			_ToolPoint(hp::Point point) const;
+			// Stamps the brush at point and its mirror images.
+			hp::Rect			_StampBrush(hp::Point point);
 
 			hp::Point			_PenPoint(hp::Point point) const;
 			hp::Rect			_PenBounds(hp::Point a, hp::Point b) const;
@@ -128,6 +166,13 @@ private:
 			bool				_ShiftDown() const;
 			bool				_OptionDown() const;
 			bool				_CommandDown() const;
+
+			// Page coordinates of a view point, and the view area of a page
+			// rect (which differ in FatBits).
+			hp::Point			_PagePoint(BPoint where) const;
+			void				_InvalidatePage(BRect rect);
+			BRect				_FatPreviewFrame() const;
+			void				_DrawFatBits(BRect updateRect);
 
 			void				_Erase(hp::Point from, hp::Point to);
 			void				_CanvasChanged(hp::Rect dirty);
@@ -150,6 +195,15 @@ private:
 			int					fBrush;
 			hp::Mask16			fBrushMask;
 			hp::Mask16			fSprayMask;
+			bool				fGrid;
+			uint8_t				fSymmetry;
+			hp::Point			fMirrorCenter;
+			int					fZoom;		// 1, or 8 in FatBits
+
+			// The grabber works in screen coordinates, which don't move as
+			// the view scrolls.
+			BPoint				fGrabStart;
+			BPoint				fGrabOrigin;
 
 			bool				fTracking;
 			bool				fPencilBlack;
@@ -174,6 +228,16 @@ private:
 			bool				fKeepHeight;
 			bool				fInSelection;
 
+			TextStyle			fTextStyle;
+			bool				fTextActive;	// a caret is placed
+			bool				fTextStarted;	// and something was typed
+			std::vector<BString> fTextLines;
+			hp::Point			fTextOrigin;	// the first baseline's start
+			hp::Rect			fTextBounds;
+			hp::Point			fCaret;
+			int					fCaretHeight;
+			int					fCaretTicks;
+
 			std::vector<hp::Point> fOverlay;
 			bool				fOverlayAnts;
 			hp::Rect			fOverlayBounds;
@@ -188,6 +252,8 @@ private:
 			BCursor*			fBrushCursor;
 			BCursor*			fLassoCursor;
 			BCursor*			fSelectCursor;
+			BCursor*			fGrabberCursor;
+			BCursor*			fTextCursor;
 			BCursor*			fArrowCursor;
 			BCursor*			fLineCursors[4];	// sizes 1, 2, 4, 8
 };

@@ -31,21 +31,6 @@ enum class Tool : int32 {
 
 static const int kToolCount = 20;
 
-// Tools HaikuPaint doesn't have yet show in the palette but can't be
-// chosen.
-inline bool
-IsToolImplemented(Tool tool)
-{
-	switch (tool) {
-		case Tool::Grabber:
-		case Tool::Text:
-			return false;
-		default:
-			return true;
-	}
-}
-
-
 // Messages the palettes post to MainWindow, which forwards them to the
 // canvas and keeps the palettes' highlights in sync.
 enum {
@@ -56,7 +41,24 @@ enum {
 									// (false: MacPaint's "no border")
 	kMsgChooseBrush		= 'cbsh',	// opens the brush shape chooser
 	kMsgSetBrush		= 'sbsh',	// "brush" int32 (0-31, as theBrush)
-	kMsgSelectAll		= 'sall'	// also: double-click the marquee
+	kMsgSelectAll		= 'sall',	// also: double-click the marquee
+	kMsgEditPattern		= 'edpt',	// opens Edit Pattern for the current one
+	kMsgPatternEdited	= 'ptok',	// "index" int32, "pattern" B_RAW_TYPE (8)
+	kMsgChooseMirrors	= 'cmir',	// opens Brush Mirrors
+	kMsgSetMirrors		= 'smir',	// "mirrors" int32, kMirror* flags
+	kMsgToggleGrid		= 'grid',
+	kMsgToggleFatBits	= 'fatb',	// also: double-click the pencil
+	kMsgShowPage		= 'shpg',	// also: double-click the grabber
+	kMsgShowPageDone	= 'shpd'	// "shift" and "origin" BPoint, in pixels
+};
+
+
+// Brush Mirrors' four lines, as MacPaint's hSym, vSym, hvSym and vhSym.
+enum {
+	kMirrorVertical		= 1,
+	kMirrorHorizontal	= 2,
+	kMirrorDiagonal		= 4,	// top left to bottom right
+	kMirrorAntiDiagonal	= 8
 };
 
 

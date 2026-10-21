@@ -53,8 +53,6 @@ ToolPalette::MouseDown(BPoint where)
 
 	int row = ((int)where.y - 1) / kRowSpace;
 	Tool tool = (Tool)(2 * row + (where.x > kMid ? 1 : 0));
-	if (!IsToolImplemented(tool))
-		return;
 
 	// Double-clicks, as in MacPaint: the eraser clears the page, the brush
 	// opens the brush shapes.
@@ -73,6 +71,10 @@ ToolPalette::MouseDown(BPoint where)
 		Window()->PostMessage(kMsgChooseBrush);
 	if (clicks >= 2 && tool == Tool::Select)
 		Window()->PostMessage(kMsgSelectAll);
+	if (clicks >= 2 && tool == Tool::Pencil)
+		Window()->PostMessage(kMsgToggleFatBits);
+	if (clicks >= 2 && tool == Tool::Grabber)
+		Window()->PostMessage(kMsgShowPage);
 }
 
 

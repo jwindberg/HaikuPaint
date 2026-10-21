@@ -5,6 +5,7 @@
 #include "MacPaintFile.h"
 #include "Patterns.h"
 #include "Selection.h"
+#include "Symmetry.h"
 
 #include <cstdio>
 #include <cstdlib>
@@ -311,6 +312,14 @@ TestCopyRect()
 	CHECK(CountBlack(canvas) == 5 * 3);
 	canvas.CopyRect(snapshot, {-5, -5, 100, 100});
 	CHECK(CountBlack(canvas) == 400);
+
+	// Offsetting loses what moves off the page and brings in white.
+	hp::Canvas page(20, 20);
+	page.FillRect(0, 0, 9, 9, hp::kBlackPattern);
+	page.Offset(5, -3);
+	CHECK(CountBlack(page) == 10 * 7);
+	CHECK(page.Get(5, 0) && page.Get(14, 6) && !page.Get(4, 0)
+		&& !page.Get(5, 7));
 }
 
 
@@ -410,6 +419,21 @@ TestMacPaintFile()
 	std::string error;
 	CHECK(hp::ReadMacPaint(file.data(), file.size(), loaded, &error));
 	CHECK(loaded.Pixels() == canvas.Pixels());
+
+	// The document's own patterns come back; version 1 files have none.
+	hp::Pattern custom[hp::kPatternCount];
+	std::memcpy(custom, hp::kPatterns, sizeof(custom));
+	custom[5] = {{1, 2, 3, 4, 5, 6, 7, 8}};
+	std::vector<uint8_t> customFile = hp::WriteMacPaint(canvas, custom);
+	hp::Pattern read[hp::kPatternCount];
+	bool hasPatterns = false;
+	CHECK(hp::ReadMacPaint(customFile.data(), customFile.size(), loaded,
+		&error, read, &hasPatterns));
+	CHECK(hasPatterns && std::memcmp(read, custom, sizeof(custom)) == 0);
+	customFile[3] = 1;
+	CHECK(hp::ReadMacPaint(customFile.data(), customFile.size(), loaded,
+		&error, read, &hasPatterns));
+	CHECK(!hasPatterns);
 
 	// A blank document is exactly BlankDoc's 512 + 720 * 2 bytes.
 	hp::Canvas blank;
@@ -614,6 +638,56 @@ TestSelectionClipboardFormat()
 }
 
 
+static bool
+HasPoint(const std::vector<hp::Point>& points, hp::Point point)
+{
+	for (const hp::Point& candidate : points) {
+		if (candidate == point)
+			return true;
+	}
+	return false;
+}
+
+
+static void
+TestSymmetryAndGrid()
+{
+	CHECK(hp::MapSymmetry(false, false, false, false) == hp::kNoSymmetry);
+	CHECK(hp::MapSymmetry(true, true, false, false) == 0xF0);
+	CHECK(hp::MapSymmetry(true, false, true, false) == 0xFF);
+
+	hp::Point center = {100, 100};
+	hp::Point point = {110, 103};
+	std::vector<hp::Point> none = hp::SymmetricPoints(point, center,
+		hp::kNoSymmetry);
+	CHECK(none.size() == 1 && none[0] == point);
+
+	// The vertical mirror reflects left/right.
+	std::vector<hp::Point> vertical = hp::SymmetricPoints(point, center,
+		hp::MapSymmetry(true, false, false, false));
+	CHECK(vertical.size() == 2 && HasPoint(vertical, {90, 103}));
+
+	// Both axes: four copies.
+	std::vector<hp::Point> both = hp::SymmetricPoints(point, center,
+		hp::MapSymmetry(true, true, false, false));
+	CHECK(both.size() == 4 && HasPoint(both, {90, 97})
+		&& HasPoint(both, {110, 97}));
+
+	// The diagonal swaps the offsets.
+	std::vector<hp::Point> diagonal = hp::SymmetricPoints(point, center,
+		hp::MapSymmetry(false, false, true, false));
+	CHECK(diagonal.size() == 2 && HasPoint(diagonal, {103, 110}));
+
+	// All eight.
+	CHECK(hp::SymmetricPoints(point, center, 0xFF).size() == 8);
+
+	// Grid: the nearest multiple of 8.
+	CHECK(hp::SnapToGrid({3, 4}) == (hp::Point{0, 8}));
+	CHECK(hp::SnapToGrid({12, 11}) == (hp::Point{16, 8}));
+	CHECK(hp::SnapToGrid({-3, -5}) == (hp::Point{0, -8}));
+}
+
+
 int
 main()
 {
@@ -639,6 +713,7 @@ main()
 	TestSelectionTransforms();
 	TestTraceEdges();
 	TestSelectionClipboardFormat();
+	TestSymmetryAndGrid();
 
 	if (sFailures != 0) {
 		std::fprintf(stderr, "%d check(s) failed\n", sFailures);

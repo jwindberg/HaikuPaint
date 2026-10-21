@@ -15,6 +15,7 @@
 
 #include "BitmapUtils.h"
 #include "PaintFont.h"
+#include "Symmetry.h"
 
 
 // MacPaint's eraser is its 16 x 16 cursor box, centered on the hotspot.
@@ -32,15 +33,11 @@ static const bigtime_t kAntsInterval = 40000;
 
 // HaikuPaint's own clipboard data, which keeps lasso transparency. An
 // archived BBitmap under "image/bitmap" goes along for other apps.
+// FatBits: MacPaint's 8x magnification.
+static const int kFatZoom = 8;
+
 static const char* kSelectionClipboardType
 	= "application/x-vnd.HaikuPaint-selection";
-
-
-static hp::Point
-PointOf(BPoint where)
-{
-	return {(int)floorf(where.x), (int)floorf(where.y)};
-}
 
 
 // Pixels a 16 x 16 mask stamped at point can touch.
@@ -148,6 +145,24 @@ IsSelectionTool(Tool tool)
 }
 
 
+// The tools MacPaint's Grid applies to (its cheapSet: tools 1, 3, 8, 10-15,
+// 18 and 19).
+static bool
+IsGridTool(Tool tool)
+{
+	switch (tool) {
+		case Tool::Select:
+		case Tool::Text:
+		case Tool::Line:
+		case Tool::Polygon:
+		case Tool::FilledPolygon:
+			return true;
+		default:
+			return IsShapeTool(tool);
+	}
+}
+
+
 CanvasView::CanvasView()
 	:
 	BView("canvas", B_WILL_DRAW | B_FRAME_EVENTS),
@@ -162,6 +177,10 @@ CanvasView::CanvasView()
 	fBrush(kDefaultBrush),
 	fBrushMask(MaskFromGlyph(kGlyphFirstBrush + kDefaultBrush)),
 	fSprayMask(MaskFromGlyph(kGlyphSpray)),
+	fGrid(false),
+	fSymmetry(hp::kNoSymmetry),
+	fMirrorCenter({0, 0}),
+	fZoom(1),
 	fTracking(false),
 	fPencilBlack(true),
 	fStart({0, 0}),
@@ -176,6 +195,13 @@ CanvasView::CanvasView()
 	fKeepWidth(false),
 	fKeepHeight(false),
 	fInSelection(false),
+	fTextActive(false),
+	fTextStarted(false),
+	fTextOrigin({0, 0}),
+	fTextBounds({0, 0, 0, 0}),
+	fCaret({0, 0}),
+	fCaretHeight(0),
+	fCaretTicks(0),
 	fOverlayAnts(false),
 	fOverlayBounds({0, 0, 0, 0}),
 	fAntsPhase(0),
@@ -192,6 +218,8 @@ CanvasView::CanvasView()
 	fBrushCursor = NewGlyphCursor(kGlyphFirstBrush + fBrush, 0, 8, 8);
 	fLassoCursor = NewGlyphCursor('E', 0, 2, 15);
 	fSelectCursor = NewGlyphCursor('r', 's', 8, 8);
+	fGrabberCursor = NewGlyphCursor('G', 'm', 8, 8);
+	fTextCursor = NewGlyphCursor('n', 0, 8, 13);
 	fArrowCursor = new BCursor(B_CURSOR_ID_SYSTEM_DEFAULT);
 	const int lineGlyphs[] = {kGlyphLineCursor1, kGlyphLineCursor2,
 		kGlyphLineCursor4, kGlyphLineCursor8};
@@ -211,6 +239,8 @@ CanvasView::~CanvasView()
 	delete fBrushCursor;
 	delete fLassoCursor;
 	delete fSelectCursor;
+	delete fGrabberCursor;
+	delete fTextCursor;
 	delete fArrowCursor;
 	for (BCursor* cursor : fLineCursors)
 		delete cursor;
@@ -253,6 +283,12 @@ CanvasView::MessageReceived(BMessage* message)
 
 		case kMsgMarchAnts:
 		{
+			// The text caret blinks about twice a second.
+			if (fTextActive) {
+				if (++fCaretTicks % 12 == 0)
+					_ShowCaret(fOverlay.empty());
+				break;
+			}
 			if (!fOverlayAnts || fOverlay.empty())
 				break;
 			fAntsPhase = (fAntsPhase + 1) & 7;
@@ -263,7 +299,7 @@ CanvasView::MessageReceived(BMessage* message)
 				}
 			}
 			const hp::Rect& bounds = fOverlayBounds;
-			Invalidate(BRect(bounds.left, bounds.top, bounds.right - 1,
+			_InvalidatePage(BRect(bounds.left, bounds.top, bounds.right - 1,
 				bounds.bottom - 1));
 			break;
 		}
@@ -278,10 +314,24 @@ CanvasView::MessageReceived(BMessage* message)
 void
 CanvasView::Draw(BRect updateRect)
 {
+	if (fZoom > 1) {
+		_DrawFatBits(updateRect);
+		return;
+	}
 	BRect rect = updateRect
 		& BRect(0, 0, fCanvas.Width() - 1, fCanvas.Height() - 1);
 	if (rect.IsValid())
 		DrawBitmap(fBitmap, rect, rect);
+}
+
+
+void
+CanvasView::ScrollTo(BPoint where)
+{
+	BView::ScrollTo(where);
+	// The FatBits preview stays put while the fat pixels scroll under it.
+	if (fZoom > 1)
+		Invalidate();
 }
 
 
@@ -296,6 +346,10 @@ CanvasView::FrameResized(float newWidth, float newHeight)
 void
 CanvasView::KeyDown(const char* bytes, int32 numBytes)
 {
+	if (fTextActive) {
+		_TypeText(bytes, numBytes);
+		return;
+	}
 	// As in MacPaint, any key ends a polygon in progress.
 	if (fPolygonActive) {
 		_FinishPolygon(false);
@@ -316,11 +370,28 @@ CanvasView::MouseDown(BPoint where)
 	MakeFocus();
 	SetMouseEventMask(B_POINTER_EVENTS,
 		B_LOCK_WINDOW_FOCUS | B_NO_POINTER_HISTORY);
-	hp::Point point = PointOf(where);
+	hp::Point unsnapped = _PagePoint(where);
+	hp::Point point = _ToolPoint(unsnapped);
 	fTracking = true;
 
 	if (IsSelectionTool(fTool)) {
-		_SelectionMouseDown(point);
+		_SelectionMouseDown(point, unsnapped);
+		return;
+	}
+
+	if (fTool == Tool::Text) {
+		// PlaceCaret: a new block of text starts here.
+		_AcceptSelection();
+		_PlaceCaret(point);
+		fTracking = false;
+		return;
+	}
+
+	if (fTool == Tool::Grabber) {
+		// ScrollDoc: drag the page around in the window.
+		fGrabStart = ConvertToScreen(where);
+		fGrabOrigin = Bounds().LeftTop();
+		fAxisLock = hp::AxisLock({(int)fGrabStart.x, (int)fGrabStart.y});
 		return;
 	}
 
@@ -352,9 +423,14 @@ CanvasView::MouseDown(BPoint where)
 			break;
 
 		case Tool::Brush:
-			fCanvas.StampMask(fBrushMask, point.x, point.y, fPattern);
-			_CanvasChanged(MaskBounds(point));
+		{
+			// Brush Mirrors reflect around the middle of the window.
+			hp::Rect visible = _VisibleBounds();
+			fMirrorCenter = {(visible.left + visible.right) / 2,
+				(visible.top + visible.bottom) / 2};
+			_CanvasChanged(_StampBrush(point));
 			break;
+		}
 
 		case Tool::Pencil:
 			// Like MacPaint: starting on a black pixel draws white.
@@ -396,14 +472,15 @@ void
 CanvasView::MouseMoved(BPoint where, uint32 transit,
 	const BMessage* dragMessage)
 {
-	hp::Point point = PointOf(where);
+	hp::Point unsnapped = _PagePoint(where);
+	hp::Point point = _ToolPoint(unsnapped);
 
 	// Belt and braces for the startup cursor case in AttachedToWindow().
 	if (transit == B_ENTERED_VIEW)
 		_UpdateCursor();
 
 	// The arrow over a selection, as in MacPaint's TrackCursor.
-	bool inSelection = fDrag == kDragNone && _InSelection(point);
+	bool inSelection = fDrag == kDragNone && _InSelection(unsnapped);
 	if (inSelection != fInSelection) {
 		fInSelection = inSelection;
 		_UpdateCursor();
@@ -419,6 +496,24 @@ CanvasView::MouseMoved(BPoint where, uint32 transit,
 
 	if (!fTracking)
 		return;
+
+	if (fTool == Tool::Grabber) {
+		BPoint screen = ConvertToScreen(where);
+		hp::Point moved = {(int)screen.x, (int)screen.y};
+		if (_ShiftDown())
+			moved = fAxisLock.Apply(moved);
+		// ScrollFat moves a third of a fat pixel per screen pixel.
+		float factor = fZoom > 1 ? fZoom / 3.0f : 1.0f;
+		BPoint origin(fGrabOrigin.x - (moved.x - fGrabStart.x) * factor,
+			fGrabOrigin.y - (moved.y - fGrabStart.y) * factor);
+		BRect bounds = Bounds();
+		origin.x = std::max(0.0f, std::min(origin.x,
+			fCanvas.Width() * fZoom - bounds.Width() - 1));
+		origin.y = std::max(0.0f, std::min(origin.y,
+			fCanvas.Height() * fZoom - bounds.Height() - 1));
+		ScrollTo(BPoint(roundf(origin.x), roundf(origin.y)));
+		return;
+	}
 
 	if (IsSelectionTool(fTool)) {
 		switch (fDrag) {
@@ -469,9 +564,11 @@ CanvasView::MouseMoved(BPoint where, uint32 transit,
 			int moved = std::abs(point.x - fLast.x)
 				+ std::abs(point.y - fLast.y);
 			if (fTool == Tool::Brush && moved > 1) {
-				fCanvas.StrokeMask(fBrushMask, fLast.x, fLast.y, point.x,
-					point.y, fPattern);
-				_CanvasChanged(MaskBounds(fLast).Union(MaskBounds(point)));
+				hp::Rect dirty = {0, 0, 0, 0};
+				for (const hp::Point& step : hp::MaskStrokePoints(fLast.x,
+						fLast.y, point.x, point.y))
+					dirty = dirty.Union(_StampBrush(step));
+				_CanvasChanged(dirty);
 				fLast = point;
 			} else if (fTool == Tool::Spray && moved > 2) {
 				fCanvas.StampMask(fSprayMask, point.x, point.y, fPattern);
@@ -523,7 +620,7 @@ CanvasView::MouseMoved(BPoint where, uint32 transit,
 void
 CanvasView::MouseUp(BPoint where)
 {
-	hp::Point point = PointOf(where);
+	hp::Point point = _ToolPoint(_PagePoint(where));
 	if (fPolygonActive) {
 		if (_ShiftDown())
 			point = hp::Constrain(fPoints.back(), point, true);
@@ -584,6 +681,7 @@ CanvasView::SetBrush(int brush)
 void
 CanvasView::Clear()
 {
+	_AcceptText();
 	if (fPolygonActive)
 		_FinishPolygon(false);
 	if (fSelection) {
@@ -691,6 +789,10 @@ CanvasView::Paste()
 	int height = pasted.rect.Height();
 	int left = (visible.left + visible.right - width) / 2;
 	int top = (visible.top + visible.bottom - height) / 2;
+	if (fGrid) {
+		left = hp::TruncToGrid(left + 4);
+		top = hp::TruncToGrid(top + 4);
+	}
 	pasted.rect = {left, top, left + width, top + height};
 
 	if (fPolygonActive)
@@ -926,11 +1028,11 @@ CanvasView::_FinishFilledFreeform()
 
 
 void
-CanvasView::_SelectionMouseDown(hp::Point point)
+CanvasView::_SelectionMouseDown(hp::Point point, hp::Point unsnapped)
 {
 	// EditDoc: inside the selection, drag it; elsewhere, make a new one.
-	if (fSelection && _InSelection(point)) {
-		_BeginSelectionDrag(point);
+	if (fSelection && _InSelection(unsnapped)) {
+		_BeginSelectionDrag(unsnapped);
 		return;
 	}
 
@@ -1046,10 +1148,17 @@ CanvasView::_DragSelection(hp::Point point)
 	} else {
 		// Pinned so the selection stays on the page (or, if stretched
 		// bigger than the page, at least its top left corner does).
+		// With the grid on, moves go in steps of 8 (DragImage sets
+		// toolGrid for every selection).
 		const hp::Rect& rect = fDragStartRect;
-		int dx = std::max(-rect.left, std::min(point.x - fStart.x,
-			fCanvas.Width() - rect.right));
-		int dy = std::max(-rect.top, std::min(point.y - fStart.y,
+		int dx = point.x - fStart.x;
+		int dy = point.y - fStart.y;
+		if (fGrid) {
+			dx = hp::TruncToGrid(dx);
+			dy = hp::TruncToGrid(dy);
+		}
+		dx = std::max(-rect.left, std::min(dx, fCanvas.Width() - rect.right));
+		dy = std::max(-rect.top, std::min(dy,
 			fCanvas.Height() - rect.bottom));
 		fSelection->rect = {rect.left + dx, rect.top + dy, rect.right + dx,
 			rect.bottom + dy};
@@ -1148,8 +1257,9 @@ CanvasView::_SelectionChanged()
 void
 CanvasView::_AcceptSelection()
 {
-	// AcceptEdits: the canvas already shows the selection where it is, so
-	// accepting only forgets it.
+	// AcceptEdits: the canvas already shows the selection (and any text)
+	// where it is, so accepting only forgets it.
+	_AcceptText();
 	if (!fSelection)
 		return;
 	fSelection.reset();
@@ -1225,7 +1335,7 @@ CanvasView::_SetOverlay(std::vector<hp::Point> points, bool ants)
 
 	dirty = dirty.Union(fOverlayBounds);
 	if (!dirty.IsEmpty()) {
-		Invalidate(BRect(dirty.left, dirty.top, dirty.right - 1,
+		_InvalidatePage(BRect(dirty.left, dirty.top, dirty.right - 1,
 			dirty.bottom - 1));
 	}
 }
@@ -1237,6 +1347,27 @@ CanvasView::_AppendOverlay(const std::vector<hp::Point>& points)
 	fOverlay.insert(fOverlay.end(), points.begin(), points.end());
 	fOverlayBounds = fOverlayBounds.Union(BoundsOf(points));
 	_CanvasChanged(BoundsOf(points));
+}
+
+
+hp::Point
+CanvasView::_ToolPoint(hp::Point point) const
+{
+	return fGrid && IsGridTool(fTool) ? hp::SnapToGrid(point) : point;
+}
+
+
+hp::Rect
+CanvasView::_StampBrush(hp::Point point)
+{
+	// SymBrush: mirrors apply to the brush only.
+	hp::Rect dirty = {0, 0, 0, 0};
+	for (const hp::Point& mirrored : hp::SymmetricPoints(point,
+			fMirrorCenter, fSymmetry)) {
+		fCanvas.StampMask(fBrushMask, mirrored.x, mirrored.y, fPattern);
+		dirty = dirty.Union(MaskBounds(mirrored));
+	}
+	return dirty;
 }
 
 
@@ -1309,12 +1440,252 @@ CanvasView::_CommandDown() const
 
 
 void
+CanvasView::SetTextStyle(const TextStyle& style)
+{
+	fTextStyle = style;
+	if (!fTextActive)
+		return;
+	if (fTextStarted)
+		_RenderText();
+	else
+		_PlaceCaret(fTextOrigin);
+}
+
+
+void
+CanvasView::_PlaceCaret(hp::Point point)
+{
+	fTextActive = true;
+	fTextStarted = false;
+	fTextLines.assign(1, BString());
+	fTextOrigin = point;
+	fTextBounds = {0, 0, 0, 0};
+
+	TextLayout layout = RenderText(fTextLines, fTextStyle, fTextOrigin,
+		fGrid);
+	fCaret = layout.caret;
+	fCaretHeight = layout.caretHeight;
+	fCaretTicks = 0;
+	_ShowCaret(true);
+}
+
+
+void
+CanvasView::_TypeText(const char* bytes, int32 numBytes)
+{
+	// TextChar. Haiku's Return key is B_ENTER, so it starts a new line,
+	// and Escape takes the place of MacPaint's Enter, which accepted.
+	if (bytes[0] == B_ESCAPE) {
+		_AcceptText();
+		return;
+	}
+
+	bool newLine = bytes[0] == B_ENTER;
+	bool backspace = bytes[0] == B_BACKSPACE;
+	bool printable = (uint8)bytes[0] >= ' ' && bytes[0] != B_DELETE;
+	if (!newLine && !backspace && !printable)
+		return;
+
+	if (!fTextStarted) {
+		_BeginOperation();
+		fTextStarted = true;
+	}
+
+	if (newLine)
+		fTextLines.push_back(BString());
+	else if (backspace) {
+		BString& line = fTextLines.back();
+		if (line.CountChars() > 0)
+			line.TruncateChars(line.CountChars() - 1);
+		else if (fTextLines.size() > 1)
+			fTextLines.pop_back();
+	} else
+		fTextLines.back().Append(bytes, numBytes);
+
+	_RenderText();
+}
+
+
+void
+CanvasView::_RenderText()
+{
+	// UpdateText: restore the page under the old text, then OR in the new.
+	TextLayout layout = RenderText(fTextLines, fTextStyle, fTextOrigin,
+		fGrid);
+	hp::Rect old = fTextBounds;
+	fCanvas.CopyRect(fUndo, old);
+	for (int y = 0; y < layout.mask.Height(); y++) {
+		for (int x = 0; x < layout.mask.Width(); x++) {
+			if (layout.mask.Get(x, y))
+				fCanvas.Set(layout.bounds.left + x, layout.bounds.top + y,
+					true);
+		}
+	}
+	fTextBounds = layout.bounds;
+	fCaret = layout.caret;
+	fCaretHeight = layout.caretHeight;
+	_CanvasChanged(old.Union(layout.bounds));
+
+	fCaretTicks = 0;
+	_ShowCaret(true);
+}
+
+
+void
+CanvasView::_AcceptText()
+{
+	if (!fTextActive)
+		return;
+	fTextActive = false;
+	fTextStarted = false;
+	fTextLines.clear();
+	fTextBounds = {0, 0, 0, 0};
+	_SetOverlay({}, false);
+}
+
+
+void
+CanvasView::_ShowCaret(bool visible)
+{
+	std::vector<hp::Point> caret;
+	if (visible) {
+		for (int y = 0; y < fCaretHeight; y++)
+			caret.push_back({fCaret.x, fCaret.y + y});
+	}
+	_SetOverlay(std::move(caret), false);
+}
+
+
+void
+CanvasView::SetFatBits(bool fatBits)
+{
+	if (fatBits == (fZoom > 1))
+		return;
+	if (fPolygonActive)
+		_FinishPolygon(false);
+
+	// MenuCommand(fatItem): center on the selection if there is one.
+	hp::Rect around = fSelection ? fSelection->rect : _VisibleBounds();
+	hp::Point center = {(around.left + around.right) / 2,
+		(around.top + around.bottom) / 2};
+	_AcceptSelection();
+
+	fZoom = fatBits ? kFatZoom : 1;
+	_UpdateScrollBars();
+	BRect bounds = Bounds();
+	float maxX = std::max(0.0f, fCanvas.Width() * fZoom - bounds.Width() - 1);
+	float maxY = std::max(0.0f,
+		fCanvas.Height() * fZoom - bounds.Height() - 1);
+	BPoint origin(center.x * fZoom - bounds.Width() / 2,
+		center.y * fZoom - bounds.Height() / 2);
+	origin.x = roundf(std::max(0.0f, std::min(origin.x, maxX)));
+	origin.y = roundf(std::max(0.0f, std::min(origin.y, maxY)));
+	ScrollTo(origin);
+	Invalidate();
+}
+
+
+void
+CanvasView::OffsetPage(int dx, int dy)
+{
+	if (dx == 0 && dy == 0)
+		return;
+	if (fPolygonActive)
+		_FinishPolygon(false);
+	_AcceptSelection();
+	_BeginOperation();
+	fCanvas.Offset(dx, dy);
+	_CanvasChanged(_CanvasBounds());
+}
+
+
+void
+CanvasView::ScrollToPage(hp::Point origin)
+{
+	ScrollTo(BPoint(origin.x * fZoom, origin.y * fZoom));
+}
+
+
+hp::Point
+CanvasView::_PagePoint(BPoint where) const
+{
+	return {(int)floorf(where.x / fZoom), (int)floorf(where.y / fZoom)};
+}
+
+
+void
+CanvasView::_InvalidatePage(BRect rect)
+{
+	if (fZoom == 1) {
+		Invalidate(rect);
+		return;
+	}
+	Invalidate(BRect(rect.left * fZoom, rect.top * fZoom,
+		(rect.right + 1) * fZoom - 1, (rect.bottom + 1) * fZoom - 1));
+	// The actual size preview shows the change too.
+	Invalidate(_FatPreviewFrame());
+}
+
+
+BRect
+CanvasView::_FatPreviewFrame() const
+{
+	// MacPaint's little actual size view, in the window's top left corner.
+	hp::Rect visible = _VisibleBounds();
+	BPoint corner = Bounds().LeftTop() + BPoint(8, 8);
+	return BRect(corner.x, corner.y, corner.x + visible.Width() + 1,
+		corner.y + visible.Height() + 1);
+}
+
+
+void
+CanvasView::_DrawFatBits(BRect updateRect)
+{
+	// FatToScrn: each page pixel 7 x 7, with a white line between.
+	int left = std::max(0, (int)floorf(updateRect.left / fZoom));
+	int top = std::max(0, (int)floorf(updateRect.top / fZoom));
+	int right = std::min(fCanvas.Width() - 1,
+		(int)floorf(updateRect.right / fZoom));
+	int bottom = std::min(fCanvas.Height() - 1,
+		(int)floorf(updateRect.bottom / fZoom));
+	if (left <= right && top <= bottom) {
+		BRect source(left, top, right, bottom);
+		BRect dest(left * fZoom, top * fZoom, (right + 1) * fZoom - 1,
+			(bottom + 1) * fZoom - 1);
+		DrawBitmap(fBitmap, source, dest);
+
+		SetHighColor(255, 255, 255);
+		for (int x = left; x <= right; x++) {
+			float lineX = x * fZoom + fZoom - 1;
+			StrokeLine(BPoint(lineX, dest.top), BPoint(lineX, dest.bottom));
+		}
+		for (int y = top; y <= bottom; y++) {
+			float lineY = y * fZoom + fZoom - 1;
+			StrokeLine(BPoint(dest.left, lineY), BPoint(dest.right, lineY));
+		}
+	}
+
+	BRect preview = _FatPreviewFrame();
+	if (preview.Intersects(updateRect)) {
+		hp::Rect visible = _VisibleBounds();
+		SetHighColor(0, 0, 0);
+		StrokeRect(preview);
+		DrawBitmap(fBitmap, BRect(visible.left, visible.top,
+				visible.right - 1, visible.bottom - 1),
+			preview.InsetByCopy(1, 1));
+	}
+}
+
+
+void
 CanvasView::_Erase(hp::Point from, hp::Point to)
 {
-	// Center the eraser square on the pointer.
-	int half = kEraserSize / 2;
+	// Center the eraser square on the pointer. In FatBits it erases what
+	// its 16 pixel box covers: 2 x 2 page pixels.
+	int size = std::max(1, kEraserSize / fZoom);
+	int half = size / 2;
 	fCanvas.StrokeLine(from.x - half, from.y - half, to.x - half,
-		to.y - half, kEraserSize, hp::kWhitePattern);
+		to.y - half, size, hp::kWhitePattern);
 	hp::Rect rect = hp::RectFromPoints(from, to);
 	_CanvasChanged({rect.left - half, rect.top - half,
 		rect.right + half, rect.bottom + half});
@@ -1332,7 +1703,7 @@ CanvasView::_CanvasChanged(hp::Rect dirty)
 	if (!rect.IsValid())
 		return;
 	_SyncBitmap(rect);
-	Invalidate(rect);
+	_InvalidatePage(rect);
 }
 
 
@@ -1367,16 +1738,17 @@ CanvasView::_UpdateScrollBars()
 	float visibleWidth = bounds.Width() + 1;
 	float visibleHeight = bounds.Height() + 1;
 
+	float width = fCanvas.Width() * fZoom;
+	float height = fCanvas.Height() * fZoom;
+
 	if (BScrollBar* bar = ScrollBar(B_HORIZONTAL)) {
-		float range = std::max(0.0f, fCanvas.Width() - visibleWidth);
-		bar->SetRange(0, range);
-		bar->SetProportion(std::min(1.0f, visibleWidth / fCanvas.Width()));
+		bar->SetRange(0, std::max(0.0f, width - visibleWidth));
+		bar->SetProportion(std::min(1.0f, visibleWidth / width));
 		bar->SetSteps(8, visibleWidth);
 	}
 	if (BScrollBar* bar = ScrollBar(B_VERTICAL)) {
-		float range = std::max(0.0f, fCanvas.Height() - visibleHeight);
-		bar->SetRange(0, range);
-		bar->SetProportion(std::min(1.0f, visibleHeight / fCanvas.Height()));
+		bar->SetRange(0, std::max(0.0f, height - visibleHeight));
+		bar->SetProportion(std::min(1.0f, visibleHeight / height));
 		bar->SetSteps(8, visibleHeight);
 	}
 }
@@ -1397,6 +1769,12 @@ CanvasView::_UpdateCursor()
 			break;
 		case Tool::Select:
 			cursor = fSelectCursor;
+			break;
+		case Tool::Grabber:
+			cursor = fGrabberCursor;
+			break;
+		case Tool::Text:
+			cursor = fTextCursor;
 			break;
 		case Tool::Pencil:
 			cursor = fPencilCursor;
@@ -1438,8 +1816,10 @@ hp::Rect
 CanvasView::_VisibleBounds() const
 {
 	BRect bounds = Bounds();
-	hp::Rect visible = {(int)floorf(bounds.left), (int)floorf(bounds.top),
-		(int)floorf(bounds.right) + 1, (int)floorf(bounds.bottom) + 1};
+	hp::Rect visible = {(int)floorf(bounds.left / fZoom),
+		(int)floorf(bounds.top / fZoom),
+		(int)floorf(bounds.right / fZoom) + 1,
+		(int)floorf(bounds.bottom / fZoom) + 1};
 	return {std::max(visible.left, 0), std::max(visible.top, 0),
 		std::min(visible.right, fCanvas.Width()),
 		std::min(visible.bottom, fCanvas.Height())};

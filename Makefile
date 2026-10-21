@@ -11,15 +11,18 @@ SRCS = \
 	src/engine/MacPaintFile.cpp \
 	src/engine/Patterns.cpp \
 	src/engine/Selection.cpp \
+	src/engine/Symmetry.cpp \
 	src/ui/App.cpp \
 	src/ui/BitmapUtils.cpp \
 	src/ui/BrushWindow.cpp \
 	src/ui/CanvasView.cpp \
+	src/ui/Dialogs.cpp \
 	src/ui/DocumentIO.cpp \
 	src/ui/LineWidthPalette.cpp \
 	src/ui/MainWindow.cpp \
 	src/ui/PaintFont.cpp \
 	src/ui/PatternPalette.cpp \
+	src/ui/TextRenderer.cpp \
 	src/ui/ToolPalette.cpp
 
 RDEFS = HaikuPaint.rdef

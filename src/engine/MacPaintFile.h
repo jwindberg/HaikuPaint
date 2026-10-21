@@ -29,8 +29,12 @@ static constexpr int kMacPaintHeaderSize = 512;
 
 // Reads a MacPaint document into canvas, which must be 576 x 720. Returns
 // false, with a reason in error, if the data isn't a usable MacPaint file.
+// If patterns is given, the document's 38 patterns are copied there and
+// *hasPatterns says whether it had any (version 2 and up do).
 bool					ReadMacPaint(const uint8_t* data, size_t size,
-							Canvas& canvas, std::string* error = nullptr);
+							Canvas& canvas, std::string* error = nullptr,
+							Pattern* patterns = nullptr,
+							bool* hasPatterns = nullptr);
 
 // Encodes canvas (576 x 720) as a version 2 MacPaint document with the
 // given 38 patterns.

@@ -7,8 +7,12 @@
 
 #include <vector>
 
+#include "Patterns.h"
+#include "TextRenderer.h"
+
 
 class BFilePanel;
+class BMenu;
 class BMenuBar;
 class BMenuItem;
 class CanvasView;
@@ -36,6 +40,8 @@ private:
 	};
 
 			BMenuBar*			_BuildMenuBar();
+			void				_AddTextMenus(BMenuBar* menuBar);
+			void				_TextStyleChanged();
 
 			bool				_ConfirmDiscard(PendingAction action,
 									const entry_ref* ref = NULL);
@@ -48,6 +54,7 @@ private:
 			void				_SaveRequested(BMessage* message,
 									bool exporting);
 			void				_SetDocumentName(const char* name);
+			void				_SetPatterns(const hp::Pattern* patterns);
 			void				_ShowError(const BString& text);
 
 			CanvasView*			fCanvasView;
@@ -57,6 +64,20 @@ private:
 			BMenuItem*			fUndoItem;
 			BMenuItem*			fPasteItem;
 			std::vector<BMenuItem*> fSelectionItems;	// need a selection
+			BMenuItem*			fGridItem;
+			BMenuItem*			fFatBitsItem;
+			BMenuItem*			fMirrorsItem;
+			BMenu*				fFontMenu;
+			BMenu*				fSizeMenu;
+			BMenuItem*			fFaceItems[6];		// Plain ... Shadow
+			BMenuItem*			fAlignItems[3];
+			TextStyle			fTextStyle;
+
+			// The document's patterns (MacPaint saves them in the file),
+			// the current one, and the Goodies settings.
+			hp::Pattern			fPatterns[hp::kPatternCount];
+			int					fPatternIndex;
+			int					fMirrors;
 
 			BFilePanel*			fOpenPanel;
 			BFilePanel*			fSavePanel;

@@ -99,7 +99,7 @@ UnpackBits(const uint8_t* data, size_t size, size_t* position, uint8_t* out,
 
 bool
 ReadMacPaint(const uint8_t* data, size_t size, Canvas& canvas,
-	std::string* error)
+	std::string* error, Pattern* patterns, bool* hasPatterns)
 {
 	if (canvas.Width() != kMacPaintWidth
 		|| canvas.Height() != kMacPaintHeight) {
@@ -137,6 +137,17 @@ ReadMacPaint(const uint8_t* data, size_t size, Canvas& canvas,
 			uint8_t byte = bits[y * kMacPaintRowBytes + x / 8];
 			canvas.Set(x, y, (byte >> (7 - x % 8)) & 1);
 		}
+	}
+
+	// ReadDoc: "IF dstBuf[1,1] < 2 THEN { old format, has no patterns }".
+	if (patterns != nullptr) {
+		bool has = version >= 2;
+		if (has) {
+			for (int i = 0; i < kPatternCount; i++)
+				std::memcpy(patterns[i].rows, data + offset + 4 + i * 8, 8);
+		}
+		if (hasPatterns != nullptr)
+			*hasPatterns = has;
 	}
 	return true;
 }

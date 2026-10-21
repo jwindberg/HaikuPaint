@@ -302,22 +302,32 @@ Canvas::StampMask(const Mask16& mask, int centerX, int centerY,
 }
 
 
-void
-Canvas::StrokeMask(const Mask16& mask, int x0, int y0, int x1, int y1,
-	const Pattern& pattern)
+std::vector<Point>
+MaskStrokePoints(int x0, int y0, int x1, int y1)
 {
 	// MacPaint steps in Fixed point from the center of the start pixel and
 	// takes the integer part (HiWord) of each step.
+	std::vector<Point> points;
 	long dx = x1 - x0;
 	long dy = y1 - y0;
 	long steps = std::max(std::labs(dx), std::labs(dy));
 	for (long step = 1; step <= steps; step++) {
-		int x = (int)FloorDiv(2 * x0 * steps + steps + 2 * dx * step,
-			2 * steps);
-		int y = (int)FloorDiv(2 * y0 * steps + steps + 2 * dy * step,
-			2 * steps);
-		StampMask(mask, x, y, pattern);
+		points.push_back({
+			(int)FloorDiv(2L * x0 * steps + steps + 2 * dx * step,
+				2 * steps),
+			(int)FloorDiv(2L * y0 * steps + steps + 2 * dy * step,
+				2 * steps)});
 	}
+	return points;
+}
+
+
+void
+Canvas::StrokeMask(const Mask16& mask, int x0, int y0, int x1, int y1,
+	const Pattern& pattern)
+{
+	for (const Point& point : MaskStrokePoints(x0, y0, x1, y1))
+		StampMask(mask, point.x, point.y, pattern);
 }
 
 
@@ -334,6 +344,24 @@ Canvas::CopyRect(const Canvas& source, Rect rect)
 		std::memcpy(&fPixels[_Index(clip.left, y)],
 			&source.fPixels[_Index(clip.left, y)], clip.Width());
 	}
+}
+
+
+void
+Canvas::Offset(int dx, int dy)
+{
+	std::vector<uint8_t> moved(fPixels.size(), 0);
+	for (int y = 0; y < fHeight; y++) {
+		int fromY = y - dy;
+		if (fromY < 0 || fromY >= fHeight)
+			continue;
+		for (int x = 0; x < fWidth; x++) {
+			int fromX = x - dx;
+			if (fromX >= 0 && fromX < fWidth)
+				moved[_Index(x, y)] = fPixels[_Index(fromX, fromY)];
+		}
+	}
+	fPixels.swap(moved);
 }
 
 

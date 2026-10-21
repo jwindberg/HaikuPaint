@@ -10,10 +10,10 @@ class BBitmap;
 
 
 // MacPaint's tool palette: 20 icons from PaintFont in two columns, with the
-// selected tool inverted. Only tools HaikuPaint implements respond to
-// clicks. Posts kMsgSetTool to the window; double-clicking the eraser posts
-// kMsgClear, the brush kMsgChooseBrush and the marquee kMsgSelectAll, as
-// in MacPaint.
+// selected tool inverted. Posts kMsgSetTool to the window; double-clicking
+// the eraser posts
+// kMsgClear, the brush kMsgChooseBrush, the marquee kMsgSelectAll, the
+// pencil kMsgToggleFatBits and the grabber kMsgShowPage, as in MacPaint.
 class ToolPalette : public BView {
 public:
 								ToolPalette();

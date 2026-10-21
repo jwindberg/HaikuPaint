@@ -54,6 +54,22 @@ RectFromPoints(Point a, Point b)
 }
 
 
+// MacPaint's GridPoint, with Goodies > Grid on: the nearest point on the
+// 8 pixel grid (Trunc8(pt + 4)).
+inline int
+TruncToGrid(int value)
+{
+	return value >= 0 ? value & ~7 : -((-value + 7) & ~7);
+}
+
+
+inline Point
+SnapToGrid(Point point)
+{
+	return {TruncToGrid(point.x + 4), TruncToGrid(point.y + 4)};
+}
+
+
 // MacPaint's NearPt: within tolerance horizontally and vertically.
 inline bool
 NearPoint(Point a, Point b, int tolerance)

@@ -38,7 +38,7 @@ Keep each milestone shippable. Engine work comes with tests in
 - [x] MIME type image/x-macpaint (.mac, .pntg, .pnt), "unsaved changes"
       prompt for New, Open and Quit
 - [ ] Document icon (HVIF) for MacPaint files
-- [ ] Use the patterns saved in a document (needs pattern editing)
+- [x] Use the patterns saved in a document (with Edit Pattern, M5)
 - [ ] Dither instead of threshold when converting color images
 
 ## M4: Selections (done, pending testing on Haiku)
@@ -55,11 +55,17 @@ Keep each milestone shippable. Engine work comes with tests in
 - [x] Ctrl draws lines and borders in the current pattern (JamLine)
 - [ ] Command (Alt) as OR mode for painting (JamLine/JamFill's patOr)
 
-## M5: Goodies
-- [ ] FatBits zoom mode
-- [ ] Grabber tool and Show Page
-- [ ] Text tool with font, size and style
-- [ ] Brush mirrors
+## M5: Goodies (done, pending testing on Haiku)
+- [x] Goodies menu: Grid, FatBits, Show Page, Edit Pattern, Brush Shape,
+      Brush Mirrors (no Introduction or Short Cuts screens)
+- [x] Grid: 8 pixel snapping for MacPaint's cheapSet tools and selection
+      moves
+- [x] FatBits zoom mode with the actual size preview; double-click the
+      pencil
+- [x] Grabber tool; Show Page with page shifting; double-click the grabber
+- [x] Edit Pattern (double-click a pattern); patterns saved per document
+- [x] Brush mirrors (MapSym)
+- [x] Text tool with Font, FontSize and Style menus, live until accepted
 
 ## Later
 - [ ] Localization (Haiku's Locale Kit)

@@ -7,6 +7,8 @@
 #include "Messages.h"
 #include "Patterns.h"
 
+#include <cstring>
+
 
 // MacPaint.p's patLeft/Right/Top/Bottom/Mid, patSpace, patRow and patStart,
 // relative to the palette.
@@ -26,6 +28,7 @@ PatternPalette::PatternPalette()
 	fBitmap(NULL),
 	fIndex(hp::kDefaultPatternIndex)
 {
+	std::memcpy(fPatterns, hp::kPatterns, sizeof(fPatterns));
 	BSize size(kWidth, kHeight);
 	SetExplicitMinSize(size);
 	SetExplicitMaxSize(size);
@@ -60,6 +63,13 @@ PatternPalette::MouseDown(BPoint where)
 	BMessage message(kMsgSetPattern);
 	message.AddInt32("index", index);
 	Window()->PostMessage(&message);
+
+	// As in MacPaint, double-clicking a pattern edits it.
+	int32 clicks = 1;
+	if (BMessage* current = Window()->CurrentMessage())
+		current->FindInt32("clicks", &clicks);
+	if (clicks >= 2)
+		Window()->PostMessage(kMsgEditPattern);
 }
 
 
@@ -75,6 +85,15 @@ PatternPalette::SetPatternIndex(int index)
 
 
 void
+PatternPalette::SetPatterns(const hp::Pattern* patterns)
+{
+	std::memcpy(fPatterns, patterns, sizeof(fPatterns));
+	_Render();
+	Invalidate();
+}
+
+
+void
 PatternPalette::_Render()
 {
 	// Follows MacPaint's DrawPat.
@@ -82,14 +101,14 @@ PatternPalette::_Render()
 	DrawPaletteBox(canvas);
 
 	FrameQDRect(canvas, 8, 6, kStart - 7, kHeight - 6);
-	PaintQDRect(canvas, 9, 7, kStart - 8, kHeight - 7, hp::kPatterns[fIndex]);
+	PaintQDRect(canvas, 9, 7, kStart - 8, kHeight - 7, fPatterns[fIndex]);
 
 	PaintQDRect(canvas, kStart - 1, 1, kWidth - 1, kHeight - 1);
 	int h = kStart;
 	for (int i = 0; i < kPerRow; i++) {
-		PaintQDRect(canvas, h, 1, h + kSpace - 1, kMid, hp::kPatterns[i]);
+		PaintQDRect(canvas, h, 1, h + kSpace - 1, kMid, fPatterns[i]);
 		PaintQDRect(canvas, h, kMid + 1, h + kSpace - 1, kHeight - 1,
-			hp::kPatterns[i + kPerRow]);
+			fPatterns[i + kPerRow]);
 		h += kSpace;
 	}
 

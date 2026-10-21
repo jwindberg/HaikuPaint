@@ -48,6 +48,10 @@ enum class Shape {
 // MacPaint's corner: the diameter of a round rect's corner curves.
 static constexpr int kRoundRectCorner = 18;
 
+// The points MacPaint's BrushLine stamps a brush at going from (x0, y0) to
+// (x1, y1): one per step, not including the start.
+std::vector<Point>	MaskStrokePoints(int x0, int y0, int x1, int y1);
+
 
 // A 1-bit image. true/1 is black, false/0 is white.
 class Canvas {
@@ -125,6 +129,10 @@ public:
 			// Copies the pixels of rect from source, which must be the same
 			// size. Used to restore a snapshot under a live preview.
 			void				CopyRect(const Canvas& source, Rect rect);
+
+			// Moves the whole image by (dx, dy), as Show Page's page shift
+			// does: what moves off the page is lost, and white comes in.
+			void				Offset(int dx, int dy);
 
 			const std::vector<uint8_t>& Pixels() const { return fPixels; }
 
