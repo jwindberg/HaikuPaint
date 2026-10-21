@@ -1,6 +1,7 @@
 #include "BrushWindow.h"
 
 #include <Bitmap.h>
+#include <Catalog.h>
 #include <View.h>
 
 #include <algorithm>
@@ -8,6 +9,10 @@
 #include "BitmapUtils.h"
 #include "Messages.h"
 #include "PaintFont.h"
+
+
+#undef B_TRANSLATION_CONTEXT
+#define B_TRANSLATION_CONTEXT "BrushWindow"
 
 
 // From MacPaint's ChooseBrush and its DLOG 2004 (288 x 160).
@@ -105,7 +110,7 @@ private:
 
 BrushWindow::BrushWindow(BRect parentFrame, int brush, BMessenger target)
 	:
-	BWindow(BRect(0, 0, kWidth - 1, kHeight - 1), "Brush Shape",
+	BWindow(BRect(0, 0, kWidth - 1, kHeight - 1), B_TRANSLATE("Brush shape"),
 		B_MODAL_WINDOW_LOOK, B_MODAL_APP_WINDOW_FEEL,
 		B_NOT_RESIZABLE | B_NOT_ZOOMABLE | B_ASYNCHRONOUS_CONTROLS)
 {

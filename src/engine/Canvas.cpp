@@ -323,6 +323,24 @@ MaskStrokePoints(int x0, int y0, int x1, int y1)
 }
 
 
+Canvas
+Reduced(const Canvas& source, int factor, int minimumBlack)
+{
+	Canvas result(source.Width() / factor, source.Height() / factor);
+	for (int y = 0; y < result.Height(); y++) {
+		for (int x = 0; x < result.Width(); x++) {
+			int black = 0;
+			for (int dy = 0; dy < factor; dy++) {
+				for (int dx = 0; dx < factor; dx++)
+					black += source.Get(x * factor + dx, y * factor + dy);
+			}
+			result.Set(x, y, black >= minimumBlack);
+		}
+	}
+	return result;
+}
+
+
 void
 Canvas::StrokeMask(const Mask16& mask, int x0, int y0, int x1, int y1,
 	const Pattern& pattern)

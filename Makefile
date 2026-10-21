@@ -17,6 +17,7 @@ SRCS = \
 	src/ui/BitmapUtils.cpp \
 	src/ui/BrushWindow.cpp \
 	src/ui/CanvasView.cpp \
+	src/ui/PrintCatalog.cpp \
 	src/ui/Dialogs.cpp \
 	src/ui/DocumentIO.cpp \
 	src/ui/LineWidthPalette.cpp \
@@ -30,7 +31,12 @@ SRCS = \
 
 RDEFS = HaikuPaint.rdef icons.rdef
 
-LIBS = be tracker translation $(STDCPPLIBS)
+LIBS = be localestub tracker translation $(STDCPPLIBS)
+
+## Translations: `make catkeys` collects the English strings into
+## locales/en.catkeys; `make bindcatalogs` builds every locales/*.catkeys
+## into the application.
+LOCALES = en de fr es sv
 
 LOCAL_INCLUDE_PATHS = src/engine src/ui
 

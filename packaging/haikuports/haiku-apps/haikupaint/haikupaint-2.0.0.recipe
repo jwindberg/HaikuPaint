@@ -1,0 +1,45 @@
+SUMMARY="A re-creation of MacPaint for Haiku"
+DESCRIPTION="HaikuPaint is Bill Atkinson's 1984 MacPaint, rebuilt as a native \
+Haiku application: all twenty tools, MacPaint's original patterns, icons and \
+cursors, FatBits and the other Goodies, and real MacPaint documents."
+HOMEPAGE="https://github.com/jwindberg/HaikuPaint"
+COPYRIGHT="2026 jwindberg
+	1983-1984 Apple Computer, Inc. (MacPaint artwork)"
+LICENSE="MIT"
+REVISION="1"
+SOURCE_URI="https://github.com/jwindberg/HaikuPaint/archive/refs/tags/v$portVersion.tar.gz"
+CHECKSUM_SHA256="TO BE FILLED IN FROM THE v2.0.0 RELEASE TARBALL"
+SOURCE_DIR="HaikuPaint-$portVersion"
+
+ARCHITECTURES="all !x86_gcc2"
+SECONDARY_ARCHITECTURES="x86"
+
+PROVIDES="
+	haikupaint$secondaryArchSuffix = $portVersion
+	app:HaikuPaint = $portVersion
+	"
+REQUIRES="
+	haiku$secondaryArchSuffix
+	"
+
+BUILD_REQUIRES="
+	haiku${secondaryArchSuffix}_devel
+	"
+BUILD_PREREQUIRES="
+	cmd:gcc$secondaryArchSuffix
+	cmd:make
+	makefile_engine
+	"
+
+BUILD()
+{
+	make $jobArgs OBJ_DIR=objects
+	make bindcatalogs OBJ_DIR=objects
+}
+
+INSTALL()
+{
+	mkdir -p $appsDir
+	cp objects/HaikuPaint $appsDir
+	addAppDeskbarSymlink $appsDir/HaikuPaint
+}

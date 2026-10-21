@@ -27,6 +27,11 @@ next. Tick roadmap boxes when you finish items.
 - New `.cpp` files must be added to `SRCS` in the top-level `Makefile`.
 - Image load and save goes through the Translation Kit (add `translation` to
   `LIBS`). Don't write PNG code by hand.
+- User-visible strings go through the Locale Kit: `B_TRANSLATE()` with a
+  `B_TRANSLATION_CONTEXT` per file (after the includes). New or changed
+  strings need `make catkeys` on Haiku and entries in every
+  `locales/*.catkeys`; the engine's error messages are translated in
+  `DocumentIO.cpp` and must match `MacPaintFile.cpp` word for word.
 
 ## Style (Haiku coding guidelines)
 - Tabs (4 wide), 80 columns. Member variables use the `fName` prefix, private

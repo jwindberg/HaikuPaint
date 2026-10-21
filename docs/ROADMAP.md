@@ -80,7 +80,11 @@ Keep each milestone shippable. Engine work comes with tests in
       scaled down to fit
 - [x] MIT license; `scripts/make-package.sh` builds an .hpkg
 
-## Later
-- [ ] Localization (Haiku's Locale Kit)
-- [ ] Submit the package to HaikuPorts (a recipe in haikuports)
-- [ ] MacPaint's Print Catalog (thumbnails of several documents)
+## M7: Release 2.0 (done, pending testing on Haiku)
+- [x] MacPaint's Print Catalog: a folder's MacPaint documents, eighth size,
+      25 to a page
+- [x] Localization through the Locale Kit: English, German, French,
+      Spanish and Swedish catalogs in `locales/`, bound into the app
+- [x] HaikuPorts recipe in `packaging/haikuports/`
+- [ ] Fill in the recipe's checksum from the v2.0.0 tarball and submit it
+      to haikuports (see the note there about the MacPaint artwork)

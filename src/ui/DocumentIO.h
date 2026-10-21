@@ -17,6 +17,10 @@ extern const char* kMacPaintMimeType;
 // Registers kMacPaintMimeType with the system if it isn't known yet.
 void		InstallMacPaintMimeType();
 
+// A quick check, without reading the whole file: whether its type, name or
+// MacBinary header says it's a MacPaint document.
+bool		IsMacPaintDocument(const entry_ref& ref);
+
 // Loads a document into image (576 x 720) and its 38 patterns into
 // patterns. MacPaint files are read as they are (with the standard patterns
 // if they have none of their own); anything a Translation Kit translator

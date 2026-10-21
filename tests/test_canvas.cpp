@@ -314,6 +314,17 @@ TestCopyRect()
 	canvas.CopyRect(snapshot, {-5, -5, 100, 100});
 	CHECK(CountBlack(canvas) == 400);
 
+	// Reducing: blocks with enough black become black.
+	hp::Canvas big(24, 16);
+	big.FillRect(0, 0, 7, 7, hp::kBlackPattern);
+	big.Set(8, 0, true);
+	big.Set(9, 0, true);
+	hp::Canvas reduced = hp::Reduced(big, 8, 2);
+	CHECK(reduced.Width() == 3 && reduced.Height() == 2);
+	CHECK(reduced.Get(0, 0) && reduced.Get(1, 0) && !reduced.Get(2, 0)
+		&& !reduced.Get(0, 1));
+	CHECK(!hp::Reduced(big, 8, 3).Get(1, 0));
+
 	// Offsetting loses what moves off the page and brings in white.
 	hp::Canvas page(20, 20);
 	page.FillRect(0, 0, 9, 9, hp::kBlackPattern);

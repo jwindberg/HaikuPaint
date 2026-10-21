@@ -2,6 +2,7 @@
 
 #include <Bitmap.h>
 #include <BitmapStream.h>
+#include <Catalog.h>
 #include <Entry.h>
 #include <File.h>
 #include <Message.h>
@@ -26,6 +27,10 @@
 #include "Patterns.h"
 
 
+#undef B_TRANSLATION_CONTEXT
+#define B_TRANSLATION_CONTEXT "DocumentIO"
+
+
 const char* kMacPaintMimeType = "image/x-macpaint";
 
 // Large enough for any real MacPaint file, which is under 60 KB.
@@ -44,9 +49,9 @@ InstallMacPaintMimeType()
 
 	char text[B_MIME_TYPE_LENGTH];
 	if (mime.GetShortDescription(text) != B_OK)
-		mime.SetShortDescription("MacPaint image");
+		mime.SetShortDescription(B_TRANSLATE("MacPaint image"));
 	if (mime.GetLongDescription(text) != B_OK)
-		mime.SetLongDescription("MacPaint document");
+		mime.SetLongDescription(B_TRANSLATE("MacPaint document"));
 	if (mime.GetPreferredApp(text) != B_OK)
 		mime.SetPreferredApp(kAppSignature);
 
@@ -96,6 +101,21 @@ LooksLikeMacPaint(BFile& file, const entry_ref& ref,
 }
 
 
+bool
+IsMacPaintDocument(const entry_ref& ref)
+{
+	BFile file(&ref, B_READ_ONLY);
+	if (file.InitCheck() != B_OK)
+		return false;
+
+	// Enough for a MacBinary header and the MacPaint header after it.
+	std::vector<uint8_t> start(128 + hp::kMacPaintHeaderSize);
+	ssize_t read = file.ReadAt(0, start.data(), start.size());
+	start.resize(read > 0 ? read : 0);
+	return LooksLikeMacPaint(file, ref, start);
+}
+
+
 status_t
 LoadDocument(const entry_ref& ref, hp::Canvas& image, hp::Pattern* patterns,
 	bool* isMacPaint, BString* error)
@@ -105,7 +125,8 @@ LoadDocument(const entry_ref& ref, hp::Canvas& image, hp::Pattern* patterns,
 	BFile file(&ref, B_READ_ONLY);
 	status_t status = file.InitCheck();
 	if (status != B_OK) {
-		error->SetToFormat("Couldn't open the file: %s", strerror(status));
+		error->SetToFormat(B_TRANSLATE("Couldn't open the file: %s"),
+			strerror(status));
 		return status;
 	}
 
@@ -117,6 +138,13 @@ LoadDocument(const entry_ref& ref, hp::Canvas& image, hp::Pattern* patterns,
 		if (file.ReadAt(0, data.data(), size) != size)
 			data.clear();
 	}
+
+	// The engine's reasons (MacPaintFile.cpp), listed here so they get
+	// collected for translation; they're translated where shown, below.
+	B_TRANSLATE_MARK_VOID("The canvas isn't MacPaint's size.");
+	B_TRANSLATE_MARK_VOID("The file is too short to be a MacPaint document.");
+	B_TRANSLATE_MARK_VOID("This doesn't look like a MacPaint document.");
+	B_TRANSLATE_MARK_VOID("The MacPaint document is damaged or incomplete.");
 
 	std::string reason;
 	bool triedMacPaint = false;
@@ -144,9 +172,9 @@ LoadDocument(const entry_ref& ref, hp::Canvas& image, hp::Pattern* patterns,
 	}
 
 	if (triedMacPaint)
-		error->SetTo(reason.c_str());
+		error->SetTo(B_TRANSLATE_NOCOLLECT(reason.c_str()));
 	else
-		error->SetTo("HaikuPaint can't read this kind of file.");
+		error->SetTo(B_TRANSLATE("HaikuPaint can't read this kind of file."));
 	return B_ERROR;
 }
 
@@ -166,7 +194,7 @@ SaveMacPaint(const BEntry& entry, const hp::Canvas& image,
 			status = B_IO_ERROR;
 	}
 	if (status != B_OK) {
-		error->SetToFormat("Couldn't save the document: %s",
+		error->SetToFormat(B_TRANSLATE("Couldn't save the document: %s"),
 			strerror(status));
 		return status;
 	}
@@ -188,7 +216,7 @@ ExportPNG(const BEntry& entry, const hp::Canvas& image, BString* error)
 			&file, B_PNG_FORMAT);
 	}
 	if (status != B_OK) {
-		error->SetToFormat("Couldn't export the image: %s",
+		error->SetToFormat(B_TRANSLATE("Couldn't export the image: %s"),
 			strerror(status));
 		return status;
 	}

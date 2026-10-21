@@ -29,6 +29,12 @@ project folder; install it with `pkgman install ./HaikuPaint-*.hpkg`.
 HaikuPaint then appears in the Deskbar's Applications menu, and opens
 MacPaint documents from Tracker.
 
+## Translations
+User-visible strings are wrapped in `B_TRANSLATE()`. After changing them,
+run `make catkeys` on Haiku to update `locales/en.catkeys`, add the new
+strings to each `locales/<language>.catkeys`, and `make bindcatalogs`.
+HaikuPaint comes in English, German, French, Spanish and Swedish.
+
 ## Engine tests (anywhere)
 ```sh
 make -C tests

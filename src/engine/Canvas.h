@@ -61,6 +61,14 @@ static constexpr int kRoundRectCorner = 18;
 // (x1, y1): one per step, not including the start.
 std::vector<Point>	MaskStrokePoints(int x0, int y0, int x1, int y1);
 
+class Canvas;
+
+// The canvas shrunk by factor in each direction: each factor x factor block
+// becomes black when at least minimumBlack of its pixels are. For Show Page
+// (a third) and Print Catalog (an eighth).
+Canvas				Reduced(const Canvas& source, int factor,
+						int minimumBlack);
+
 
 // A 1-bit image. true/1 is black, false/0 is white.
 class Canvas {

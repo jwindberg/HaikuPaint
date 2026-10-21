@@ -3,6 +3,8 @@
 
 #include <SupportDefs.h>
 
+#include <vector>
+
 #include "Canvas.h"
 
 
@@ -17,6 +19,8 @@ class BMessage;
 // these functions replace it when the user changes it.
 status_t	ConfigurePage(BMessage** settings);
 status_t	PrintPage(const hp::Canvas& page, const char* name,
+				BMessage** settings);
+status_t	PrintPages(const std::vector<hp::Canvas>& pages, const char* name,
 				BMessage** settings);
 
 

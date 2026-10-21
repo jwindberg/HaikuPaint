@@ -83,6 +83,7 @@ private:
 			BFilePanel*			fOpenPanel;
 			BFilePanel*			fSavePanel;
 			BFilePanel*			fExportPanel;
+			BFilePanel*			fCatalogPanel;
 
 			// The file Save writes to; only set for MacPaint documents, so
 			// an opened PNG is never overwritten in MacPaint format.

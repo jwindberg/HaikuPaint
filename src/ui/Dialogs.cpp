@@ -2,6 +2,7 @@
 
 #include <Bitmap.h>
 #include <Button.h>
+#include <Catalog.h>
 #include <View.h>
 
 #include <algorithm>
@@ -11,6 +12,10 @@
 #include "MacIcons.h"
 #include "Messages.h"
 #include "Selection.h"
+
+
+#undef B_TRANSLATION_CONTEXT
+#define B_TRANSLATION_CONTEXT "Dialogs"
 
 
 static const uint32 kMsgOK = 'ok  ';
@@ -151,7 +156,8 @@ private:
 PatternEditWindow::PatternEditWindow(BRect parentFrame, int index,
 	const hp::Pattern& pattern, BMessenger target)
 	:
-	BWindow(BRect(0, 0, 175, 127), "Edit pattern", B_MODAL_WINDOW_LOOK,
+	BWindow(BRect(0, 0, 175, 127), B_TRANSLATE("Edit pattern"),
+		B_MODAL_WINDOW_LOOK,
 		B_MODAL_APP_WINDOW_FEEL,
 		B_NOT_RESIZABLE | B_NOT_ZOOMABLE | B_ASYNCHRONOUS_CONTROLS),
 	fIndex(index),
@@ -159,8 +165,9 @@ PatternEditWindow::PatternEditWindow(BRect parentFrame, int index,
 {
 	fEditor = new EditorView(Bounds(), pattern);
 	AddChild(fEditor);
-	BButton* ok = AddButton(fEditor, 16, 92, 80, "OK", kMsgOK);
-	AddButton(fEditor, 96, 92, 160, "Cancel", kMsgCancel);
+	BButton* ok = AddButton(fEditor, 16, 92, 80, B_TRANSLATE("OK"),
+		kMsgOK);
+	AddButton(fEditor, 96, 92, 160, B_TRANSLATE("Cancel"), kMsgCancel);
 	SetDefaultButton(ok);
 	ConfigureDialog(this, parentFrame);
 }
@@ -291,15 +298,17 @@ private:
 
 MirrorWindow::MirrorWindow(BRect parentFrame, int mirrors, BMessenger target)
 	:
-	BWindow(BRect(0, 0, 175, 175), "Brush mirrors", B_MODAL_WINDOW_LOOK,
+	BWindow(BRect(0, 0, 175, 175), B_TRANSLATE("Brush mirrors"),
+		B_MODAL_WINDOW_LOOK,
 		B_MODAL_APP_WINDOW_FEEL,
 		B_NOT_RESIZABLE | B_NOT_ZOOMABLE | B_ASYNCHRONOUS_CONTROLS),
 	fTarget(target)
 {
 	fMirrorView = new MirrorView(Bounds(), mirrors);
 	AddChild(fMirrorView);
-	BButton* ok = AddButton(fMirrorView, 16, 140, 80, "OK", kMsgOK);
-	AddButton(fMirrorView, 96, 140, 160, "None", kMsgNone);
+	BButton* ok = AddButton(fMirrorView, 16, 140, 80,
+		B_TRANSLATE("OK"), kMsgOK);
+	AddButton(fMirrorView, 96, 140, 160, B_TRANSLATE("None"), kMsgNone);
 	SetDefaultButton(ok);
 	ConfigureDialog(this, parentFrame);
 }
@@ -319,7 +328,9 @@ public:
 	PageView(BRect frame, const hp::Canvas& page, hp::Rect visible)
 		:
 		BView(frame, "page", B_FOLLOW_ALL, B_WILL_DRAW),
-		fSmall(page.Width() / kPageScale, page.Height() / kPageScale),
+		// Three or more black pixels of each 3 x 3 make a black one, which
+		// keeps light grays visible.
+		fSmall(hp::Reduced(page, kPageScale, 3)),
 		fWindow(hp::MapRect(visible, {0, 0, page.Width(), page.Height()},
 			{0, 0, page.Width() / kPageScale, page.Height() / kPageScale})),
 		fOldWindow(fWindow),
@@ -328,21 +339,6 @@ public:
 		fBitmap(NULL)
 	{
 		SetViewColor(255, 255, 255);
-
-		// Reduce 3 x 3 blocks; three or more black pixels make a black one,
-		// which keeps light grays visible.
-		for (int y = 0; y < fSmall.Height(); y++) {
-			for (int x = 0; x < fSmall.Width(); x++) {
-				int black = 0;
-				for (int dy = 0; dy < kPageScale; dy++) {
-					for (int dx = 0; dx < kPageScale; dx++) {
-						black += page.Get(x * kPageScale + dx,
-							y * kPageScale + dy);
-					}
-				}
-				fSmall.Set(x, y, black >= 3);
-			}
-		}
 		_Render();
 	}
 
@@ -491,7 +487,8 @@ ShowPageWindow::ShowPageWindow(BRect parentFrame, const hp::Canvas& page,
 	:
 	BWindow(BRect(0, 0, page.Width() / kPageScale + 2 * kPageMargin + 1,
 			page.Height() / kPageScale + 2 * kPageMargin + 50),
-		"Show page", B_MODAL_WINDOW_LOOK, B_MODAL_APP_WINDOW_FEEL,
+		B_TRANSLATE("Show page"), B_MODAL_WINDOW_LOOK,
+		B_MODAL_APP_WINDOW_FEEL,
 		B_NOT_RESIZABLE | B_NOT_ZOOMABLE | B_ASYNCHRONOUS_CONTROLS),
 	fVisible(visible),
 	fPageWidth(page.Width()),
@@ -503,9 +500,10 @@ ShowPageWindow::ShowPageWindow(BRect parentFrame, const hp::Canvas& page,
 	int buttonTop = page.Height() / kPageScale + 2 * kPageMargin + 4;
 	int middle = (int)Bounds().Width() / 2;
 	BButton* ok = AddButton(fPageView, kPageMargin, buttonTop, middle - 8,
-		"OK", kMsgOK);
+		B_TRANSLATE("OK"), kMsgOK);
 	AddButton(fPageView, middle + 8, buttonTop,
-		(int)Bounds().Width() - kPageMargin, "Cancel", kMsgCancel);
+		(int)Bounds().Width() - kPageMargin, B_TRANSLATE("Cancel"),
+		kMsgCancel);
 	SetDefaultButton(ok);
 	ConfigureDialog(this, parentFrame);
 }
@@ -601,9 +599,9 @@ public:
 	virtual void Draw(BRect updateRect)
 	{
 		const char* lines[] = {
-			"HaikuPaint version 0.6",
-			"after MacPaint, written by Bill Atkinson",
-			"MacPaint copyright 1983, Apple Computer Inc."
+			B_TRANSLATE("HaikuPaint version 2.0"),
+			B_TRANSLATE("after MacPaint, written by Bill Atkinson"),
+			B_TRANSLATE("MacPaint copyright 1983, Apple Computer Inc.")
 		};
 		font_height height;
 		GetFontHeight(&height);
@@ -620,13 +618,14 @@ private:
 
 AboutWindow::AboutWindow()
 	:
-	BWindow(BRect(0, 0, 355, 99), "About HaikuPaint", B_MODAL_WINDOW_LOOK,
+	BWindow(BRect(0, 0, 355, 99), B_TRANSLATE("About HaikuPaint"),
+		B_MODAL_WINDOW_LOOK,
 		B_MODAL_APP_WINDOW_FEEL,
 		B_NOT_RESIZABLE | B_NOT_ZOOMABLE | B_ASYNCHRONOUS_CONTROLS)
 {
 	BView* view = new AboutView(Bounds());
 	AddChild(view);
-	BButton* ok = AddButton(view, 274, 60, 346, "OK", kMsgOK);
+	BButton* ok = AddButton(view, 274, 60, 346, B_TRANSLATE("OK"), kMsgOK);
 	SetDefaultButton(ok);
 	AddShortcut(B_ESCAPE, 0, new BMessage(kMsgOK));
 	CenterOnScreen();

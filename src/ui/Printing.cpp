@@ -10,13 +10,13 @@
 #include "BitmapUtils.h"
 
 
-// Draws the page into the print job, scaled to fit if it must be.
+// Draws a page into the print job, scaled to fit if it must be.
 class PrintView : public BView {
 public:
-	PrintView(BRect frame, const hp::Canvas& page)
+	PrintView(BRect frame)
 		:
 		BView(frame, "print", B_FOLLOW_NONE, B_WILL_DRAW),
-		fBitmap(NewBitmapFromCanvas(page))
+		fBitmap(NULL)
 	{
 	}
 
@@ -25,8 +25,16 @@ public:
 		delete fBitmap;
 	}
 
+	void SetPage(const hp::Canvas& page)
+	{
+		delete fBitmap;
+		fBitmap = NewBitmapFromCanvas(page);
+	}
+
 	virtual void Draw(BRect updateRect)
 	{
+		if (fBitmap == NULL)
+			return;
 		BRect source = fBitmap->Bounds();
 		BRect bounds = Bounds();
 		float scale = std::min(1.0f,
@@ -66,6 +74,17 @@ ConfigurePage(BMessage** settings)
 status_t
 PrintPage(const hp::Canvas& page, const char* name, BMessage** settings)
 {
+	return PrintPages(std::vector<hp::Canvas>(1, page), name, settings);
+}
+
+
+status_t
+PrintPages(const std::vector<hp::Canvas>& pages, const char* name,
+	BMessage** settings)
+{
+	if (pages.empty())
+		return B_BAD_VALUE;
+
 	BPrintJob job(name);
 	if (*settings != NULL)
 		job.SetSettings(new BMessage(**settings));
@@ -88,18 +107,25 @@ PrintPage(const hp::Canvas& page, const char* name, BMessage** settings)
 	BRect frame(0, 0, printable.Width(), printable.Height());
 	BWindow* window = new BWindow(frame, "Printing", B_NO_BORDER_WINDOW_LOOK,
 		B_NORMAL_WINDOW_FEEL, B_AVOID_FOCUS);
-	PrintView* view = new PrintView(frame, page);
+	PrintView* view = new PrintView(frame);
 	window->AddChild(view);
 	window->Hide();
 	window->Show();
 
-	if (window->Lock()) {
-		job.DrawView(view, frame, BPoint(0, 0));
-		window->Unlock();
+	bool printed = true;
+	for (const hp::Canvas& page : pages) {
+		if (window->Lock()) {
+			view->SetPage(page);
+			job.DrawView(view, frame, BPoint(0, 0));
+			window->Unlock();
+		}
+		job.SpoolPage();
+		// Checked before committing: a committed job can't continue either.
+		if (!job.CanContinue()) {
+			printed = false;
+			break;
+		}
 	}
-	job.SpoolPage();
-	// Checked before committing: a committed job can't continue either.
-	bool printed = job.CanContinue();
 	if (printed)
 		job.CommitJob();
 

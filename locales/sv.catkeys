@@ -1,0 +1,80 @@
+1	swedish	application/x-vnd.HaikuPaint	3065080682
+Unsaved changes	MainWindow		Osparade ändringar
+The MacPaint document is damaged or incomplete.	DocumentIO		MacPaint-dokumentet är skadat eller ofullständigt.
+Font	MainWindow		Typsnitt
+Couldn't open the file: %s	DocumentIO		Kunde inte öppna filen: %s
+The canvas isn't MacPaint's size.	DocumentIO		Ritytan har inte MacPaints storlek.
+Style	MainWindow		Stil
+OK	MainWindow		OK
+MacPaint document	DocumentIO		MacPaint-dokument
+FontSize	MainWindow		Storlek
+Grid	MainWindow		Rutnät
+Quit	MainWindow		Avsluta
+HaikuPaint: Print catalog	MainWindow		HaikuPaint: Skriv ut katalog
+OK	Dialogs		OK
+Revert	MainWindow		Återgå
+New	MainWindow		Ny
+Brush mirrors…	MainWindow		Penselspeglar…
+None	Dialogs		Ingen
+Rotate	MainWindow		Rotera
+Print catalog…	MainWindow		Skriv ut katalog…
+There are no MacPaint documents in this folder.	MainWindow		Det finns inga MacPaint-dokument i den här mappen.
+Print…	MainWindow		Skriv ut…
+Show page	MainWindow		Visa sidan
+Cancel	MainWindow		Avbryt
+Edit	MainWindow		Redigera
+Save	MainWindow		Spara
+File	MainWindow		Arkiv
+Flip vertical	MainWindow		Spegelvänd lodrätt
+Error	MainWindow		Fel
+Save as…	MainWindow		Spara som…
+Cancel	Dialogs		Avbryt
+Show page	Dialogs		Visa sidan
+Underline	MainWindow		Understruken
+Don't save	MainWindow		Spara inte
+Revert to the last version saved?	MainWindow		Återgå till den senast sparade versionen?
+Flip horizontal	MainWindow		Spegelvänd vågrätt
+Clear	MainWindow		Radera
+HaikuPaint can't read this kind of file.	DocumentIO		HaikuPaint kan inte läsa den här sortens fil.
+Fill	MainWindow		Fyll
+FatBits	MainWindow		FatBits
+The file is too short to be a MacPaint document.	DocumentIO		Filen är för kort för att vara ett MacPaint-dokument.
+Couldn't save the document: %s	DocumentIO		Kunde inte spara dokumentet: %s
+Undo	MainWindow		Ångra
+Export as PNG…	MainWindow		Exportera som PNG…
+Align right	MainWindow		Högerjustera
+untitled	MainWindow		namnlös
+Align middle	MainWindow		Centrera
+Align left	MainWindow		Vänsterjustera
+HaikuPaint version 2.0	Dialogs		HaikuPaint version 2.0
+About HaikuPaint	Dialogs		Om HaikuPaint
+Edit pattern…	MainWindow		Redigera mönster…
+Page setup…	MainWindow		Utskriftsformat…
+MacPaint image	DocumentIO		MacPaint-bild
+About HaikuPaint…	MainWindow		Om HaikuPaint…
+MacPaint copyright 1983, Apple Computer Inc.	Dialogs		MacPaint copyright 1983, Apple Computer Inc.
+%d point	MainWindow		%d punkter
+Shadow	MainWindow		Skugga
+HaikuPaint: Export as PNG	MainWindow		HaikuPaint: Exportera som PNG
+Invert	MainWindow		Invertera
+Bold	MainWindow		Fet
+Paste	MainWindow		Klistra in
+Cut	MainWindow		Klipp ut
+Edit pattern	Dialogs		Redigera mönster
+MacPaint documents in %s	MainWindow		MacPaint-dokument i %s
+This doesn't look like a MacPaint document.	DocumentIO		Det här ser inte ut som ett MacPaint-dokument.
+Outline	MainWindow		Kontur
+Brush shape…	MainWindow		Penselform…
+Save changes to the document \"%s\"?	MainWindow		Spara ändringarna i dokumentet \"%s\"?
+Italic	MainWindow		Kursiv
+Couldn't export the image: %s	DocumentIO		Kunde inte exportera bilden: %s
+Trace edges	MainWindow		Spåra kanter
+Brush mirrors	Dialogs		Penselspeglar
+Select all	MainWindow		Markera allt
+after MacPaint, written by Bill Atkinson	Dialogs		efter MacPaint, skrivet av Bill Atkinson
+Brush shape	BrushWindow		Penselform
+Print	MainWindow		Skriv ut
+Plain	MainWindow		Normal
+Goodies	MainWindow		Extra
+Open…	MainWindow		Öppna…
+Copy	MainWindow		Kopiera

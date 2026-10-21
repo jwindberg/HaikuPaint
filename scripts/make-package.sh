@@ -6,8 +6,9 @@ set -e
 
 cd "$(dirname "$0")/.."
 make
+make bindcatalogs
 
-VERSION=0.6.0
+VERSION=2.0.0
 REVISION=1
 ARCH=$(getarch)
 STAGE=package-stage

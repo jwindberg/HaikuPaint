@@ -2,6 +2,7 @@
 
 #include <Alert.h>
 #include <Application.h>
+#include <Catalog.h>
 #include <Clipboard.h>
 #include <Directory.h>
 #include <FilePanel.h>
@@ -20,11 +21,16 @@
 #include "Messages.h"
 #include "PatternPalette.h"
 #include "Patterns.h"
+#include "PrintCatalog.h"
 #include "Printing.h"
 #include "Symmetry.h"
 #include "ToolPalette.h"
 
 #include <cstring>
+
+
+#undef B_TRANSLATION_CONTEXT
+#define B_TRANSLATION_CONTEXT "MainWindow"
 
 
 enum {
@@ -35,6 +41,8 @@ enum {
 	kMsgRevert			= 'rvrt',
 	kMsgPageSetup		= 'pgst',
 	kMsgPrint			= 'prnt',
+	kMsgPrintCatalog	= 'pcat',
+	kMsgCatalogFolder	= 'pcfd',
 	kMsgExport			= 'expt',
 	kMsgSaveRequested	= 'svrq',
 	kMsgExportRequested	= 'exrq',
@@ -49,18 +57,18 @@ enum {
 // MacPaint's FontSize menu.
 static const float kFontSizes[] = {9, 10, 12, 14, 18, 24, 36, 48, 72};
 
-static const char* kUntitled = "untitled";
 
 
 MainWindow::MainWindow()
 	:
-	BWindow(BRect(100, 100, 750, 650), kUntitled, B_TITLED_WINDOW,
+	BWindow(BRect(100, 100, 750, 650), B_TRANSLATE("untitled"),
+		B_TITLED_WINDOW,
 		B_ASYNCHRONOUS_CONTROLS | B_QUIT_ON_WINDOW_CLOSE
 			| B_AUTO_UPDATE_SIZE_LIMITS),
 	fPatternIndex(hp::kDefaultPatternIndex),
 	fMirrors(0),
 	fHasRef(false),
-	fName(kUntitled),
+	fName(B_TRANSLATE("untitled")),
 	fPendingAction(kPendingNone),
 	fPrintSettings(NULL)
 {
@@ -104,7 +112,12 @@ MainWindow::MainWindow()
 	BMessage exportMessage(kMsgExportRequested);
 	fExportPanel = new BFilePanel(B_SAVE_PANEL, &messenger, NULL,
 		B_FILE_NODE, false, &exportMessage);
-	fExportPanel->Window()->SetTitle("HaikuPaint: Export as PNG");
+	fExportPanel->Window()->SetTitle(B_TRANSLATE("HaikuPaint: Export as PNG"));
+	BMessage catalogMessage(kMsgCatalogFolder);
+	fCatalogPanel = new BFilePanel(B_OPEN_PANEL, &messenger, NULL,
+		B_DIRECTORY_NODE, false, &catalogMessage);
+	fCatalogPanel->Window()->SetTitle(B_TRANSLATE("HaikuPaint: Print catalog"));
+	fCatalogPanel->SetButtonLabel(B_DEFAULT_BUTTON, B_TRANSLATE("Print"));
 }
 
 
@@ -113,6 +126,7 @@ MainWindow::~MainWindow()
 	delete fOpenPanel;
 	delete fSavePanel;
 	delete fExportPanel;
+	delete fCatalogPanel;
 	delete fPrintSettings;
 }
 
@@ -155,13 +169,46 @@ MainWindow::MessageReceived(BMessage* message)
 			PrintPage(fCanvasView->Image(), fName.String(), &fPrintSettings);
 			break;
 
+		case kMsgPrintCatalog:
+			// Start in the document's folder, as MacPaint catalogs its disk.
+			if (fHasRef) {
+				BEntry entry(&fRef);
+				BEntry parent;
+				entry_ref folder;
+				if (entry.GetParent(&parent) == B_OK
+					&& parent.GetRef(&folder) == B_OK)
+					fCatalogPanel->SetPanelDirectory(&folder);
+			}
+			fCatalogPanel->Show();
+			break;
+
+		case kMsgCatalogFolder:
+		{
+			entry_ref folder;
+			if (message->FindRef("refs", &folder) != B_OK)
+				break;
+			BString heading;
+			heading.SetToFormat(B_TRANSLATE("MacPaint documents in %s"),
+				folder.name);
+			std::vector<hp::Canvas> pages = BuildCatalogPages(folder,
+				heading);
+			if (pages.empty()) {
+				_ShowError(B_TRANSLATE(
+					"There are no MacPaint documents in this folder."));
+				break;
+			}
+			PrintPages(pages, heading.String(), &fPrintSettings);
+			break;
+		}
+
 		case kMsgRevert:
 		{
 			if (!fHasRef)
 				break;
 			// MacPaint's Revert alert.
-			BAlert* alert = new BAlert("Revert",
-				"Revert to the last version saved?", "Cancel", "OK", NULL,
+			BAlert* alert = new BAlert(B_TRANSLATE("Revert"),
+				B_TRANSLATE("Revert to the last version saved?"),
+				B_TRANSLATE("Cancel"), B_TRANSLATE("OK"), NULL,
 				B_WIDTH_AS_USUAL, B_WARNING_ALERT);
 			alert->SetShortcut(0, B_ESCAPE);
 			if (alert->Go() == 1)
@@ -448,50 +495,55 @@ MainWindow::_BuildMenuBar()
 {
 	BMenuBar* menuBar = new BMenuBar("menubar");
 
-	BMenu* fileMenu = new BMenu("File");
-	BMenuItem* aboutItem = new BMenuItem("About HaikuPaint" B_UTF8_ELLIPSIS,
+	BMenu* fileMenu = new BMenu(B_TRANSLATE("File"));
+	BMenuItem* aboutItem = new BMenuItem(
+		B_TRANSLATE("About HaikuPaint" B_UTF8_ELLIPSIS),
 		new BMessage(B_ABOUT_REQUESTED));
 	aboutItem->SetTarget(be_app);
 	fileMenu->AddItem(aboutItem);
 	fileMenu->AddSeparatorItem();
-	fileMenu->AddItem(new BMenuItem("New", new BMessage(kMsgNew), 'N'));
-	fileMenu->AddItem(new BMenuItem("Open" B_UTF8_ELLIPSIS,
+	fileMenu->AddItem(new BMenuItem(B_TRANSLATE("New"), new BMessage(kMsgNew), 'N'));
+	fileMenu->AddItem(new BMenuItem(B_TRANSLATE("Open" B_UTF8_ELLIPSIS),
 		new BMessage(kMsgOpen), 'O'));
 	fileMenu->AddSeparatorItem();
-	fileMenu->AddItem(new BMenuItem("Save", new BMessage(kMsgSave), 'S'));
-	fileMenu->AddItem(new BMenuItem("Save as" B_UTF8_ELLIPSIS,
+	fileMenu->AddItem(new BMenuItem(B_TRANSLATE("Save"), new BMessage(kMsgSave), 'S'));
+	fileMenu->AddItem(new BMenuItem(B_TRANSLATE("Save as" B_UTF8_ELLIPSIS),
 		new BMessage(kMsgSaveAs), 'S', B_SHIFT_KEY));
-	fRevertItem = new BMenuItem("Revert", new BMessage(kMsgRevert));
+	fRevertItem = new BMenuItem(B_TRANSLATE("Revert"), new BMessage(kMsgRevert));
 	fileMenu->AddItem(fRevertItem);
-	fileMenu->AddItem(new BMenuItem("Export as PNG" B_UTF8_ELLIPSIS,
+	fileMenu->AddItem(new BMenuItem(
+		B_TRANSLATE("Export as PNG" B_UTF8_ELLIPSIS),
 		new BMessage(kMsgExport)));
 	fileMenu->AddSeparatorItem();
 	// No shortcut: Alt+P is MacPaint's Plain, and MacPaint had none.
-	fileMenu->AddItem(new BMenuItem("Page setup" B_UTF8_ELLIPSIS,
+	fileMenu->AddItem(new BMenuItem(B_TRANSLATE("Page setup" B_UTF8_ELLIPSIS),
 		new BMessage(kMsgPageSetup)));
-	fileMenu->AddItem(new BMenuItem("Print" B_UTF8_ELLIPSIS,
+	fileMenu->AddItem(new BMenuItem(B_TRANSLATE("Print" B_UTF8_ELLIPSIS),
 		new BMessage(kMsgPrint)));
+	fileMenu->AddItem(new BMenuItem(
+		B_TRANSLATE("Print catalog" B_UTF8_ELLIPSIS),
+		new BMessage(kMsgPrintCatalog)));
 	fileMenu->AddSeparatorItem();
-	fileMenu->AddItem(new BMenuItem("Quit", new BMessage(B_QUIT_REQUESTED),
+	fileMenu->AddItem(new BMenuItem(B_TRANSLATE("Quit"), new BMessage(B_QUIT_REQUESTED),
 		'Q'));
 	menuBar->AddItem(fileMenu);
 
 	// MacPaint's Edit menu, plus Select all.
-	BMenu* editMenu = new BMenu("Edit");
-	fUndoItem = new BMenuItem("Undo", new BMessage(kMsgUndo), 'Z');
+	BMenu* editMenu = new BMenu(B_TRANSLATE("Edit"));
+	fUndoItem = new BMenuItem(B_TRANSLATE("Undo"), new BMessage(kMsgUndo), 'Z');
 	editMenu->AddItem(fUndoItem);
 	editMenu->AddSeparatorItem();
 
-	BMenuItem* item = new BMenuItem("Cut", new BMessage(B_CUT), 'X');
+	BMenuItem* item = new BMenuItem(B_TRANSLATE("Cut"), new BMessage(B_CUT), 'X');
 	editMenu->AddItem(item);
 	fSelectionItems.push_back(item);
-	item = new BMenuItem("Copy", new BMessage(B_COPY), 'C');
+	item = new BMenuItem(B_TRANSLATE("Copy"), new BMessage(B_COPY), 'C');
 	editMenu->AddItem(item);
 	fSelectionItems.push_back(item);
-	fPasteItem = new BMenuItem("Paste", new BMessage(B_PASTE), 'V');
+	fPasteItem = new BMenuItem(B_TRANSLATE("Paste"), new BMessage(B_PASTE), 'V');
 	editMenu->AddItem(fPasteItem);
-	editMenu->AddItem(new BMenuItem("Clear", new BMessage(kMsgClear)));
-	editMenu->AddItem(new BMenuItem("Select all",
+	editMenu->AddItem(new BMenuItem(B_TRANSLATE("Clear"), new BMessage(kMsgClear)));
+	editMenu->AddItem(new BMenuItem(B_TRANSLATE("Select all"),
 		new BMessage(B_SELECT_ALL), 'A'));
 	editMenu->AddSeparatorItem();
 
@@ -500,36 +552,41 @@ MainWindow::_BuildMenuBar()
 		SelectionCommand	command;
 		char				shortcut;
 	} commands[] = {
-		{"Invert", SelectionCommand::Invert},
-		{"Fill", SelectionCommand::Fill},
-		{"Trace edges", SelectionCommand::TraceEdges, 'E'},
-		{"Flip horizontal", SelectionCommand::FlipHorizontal},
-		{"Flip vertical", SelectionCommand::FlipVertical},
-		{"Rotate", SelectionCommand::Rotate},
+		{B_TRANSLATE_MARK("Invert"), SelectionCommand::Invert},
+		{B_TRANSLATE_MARK("Fill"), SelectionCommand::Fill},
+		{B_TRANSLATE_MARK("Trace edges"), SelectionCommand::TraceEdges, 'E'},
+		{B_TRANSLATE_MARK("Flip horizontal"), SelectionCommand::FlipHorizontal},
+		{B_TRANSLATE_MARK("Flip vertical"), SelectionCommand::FlipVertical},
+		{B_TRANSLATE_MARK("Rotate"), SelectionCommand::Rotate},
 	};
 	for (const auto& entry : commands) {
 		BMessage* message = new BMessage(kMsgSelectionCommand);
 		message->AddInt32("command", (int32)entry.command);
-		item = new BMenuItem(entry.label, message, entry.shortcut);
+		item = new BMenuItem(B_TRANSLATE_NOCOLLECT(entry.label), message,
+			entry.shortcut);
 		editMenu->AddItem(item);
 		fSelectionItems.push_back(item);
 	}
 	menuBar->AddItem(editMenu);
 
 	// MacPaint's Goodies, without its Introduction and Short Cuts screens.
-	BMenu* goodiesMenu = new BMenu("Goodies");
-	fGridItem = new BMenuItem("Grid", new BMessage(kMsgToggleGrid));
+	BMenu* goodiesMenu = new BMenu(B_TRANSLATE("Goodies"));
+	fGridItem = new BMenuItem(B_TRANSLATE("Grid"), new BMessage(kMsgToggleGrid));
 	goodiesMenu->AddItem(fGridItem);
-	fFatBitsItem = new BMenuItem("FatBits", new BMessage(kMsgToggleFatBits));
+	fFatBitsItem = new BMenuItem(B_TRANSLATE("FatBits"),
+		new BMessage(kMsgToggleFatBits));
 	goodiesMenu->AddItem(fFatBitsItem);
-	goodiesMenu->AddItem(new BMenuItem("Show page",
+	goodiesMenu->AddItem(new BMenuItem(B_TRANSLATE("Show page"),
 		new BMessage(kMsgShowPage)));
 	goodiesMenu->AddSeparatorItem();
-	goodiesMenu->AddItem(new BMenuItem("Edit pattern" B_UTF8_ELLIPSIS,
+	goodiesMenu->AddItem(new BMenuItem(
+		B_TRANSLATE("Edit pattern" B_UTF8_ELLIPSIS),
 		new BMessage(kMsgEditPattern)));
-	goodiesMenu->AddItem(new BMenuItem("Brush shape" B_UTF8_ELLIPSIS,
+	goodiesMenu->AddItem(new BMenuItem(
+		B_TRANSLATE("Brush shape" B_UTF8_ELLIPSIS),
 		new BMessage(kMsgChooseBrush)));
-	fMirrorsItem = new BMenuItem("Brush mirrors" B_UTF8_ELLIPSIS,
+	fMirrorsItem = new BMenuItem(
+		B_TRANSLATE("Brush mirrors" B_UTF8_ELLIPSIS),
 		new BMessage(kMsgChooseMirrors));
 	goodiesMenu->AddItem(fMirrorsItem);
 	menuBar->AddItem(goodiesMenu);
@@ -544,7 +601,7 @@ void
 MainWindow::_AddTextMenus(BMenuBar* menuBar)
 {
 	// Font: the installed families.
-	fFontMenu = new BMenu("Font");
+	fFontMenu = new BMenu(B_TRANSLATE("Font"));
 	fFontMenu->SetRadioMode(true);
 	int32 count = count_font_families();
 	for (int32 i = 0; i < count; i++) {
@@ -559,13 +616,13 @@ MainWindow::_AddTextMenus(BMenuBar* menuBar)
 	}
 	menuBar->AddItem(fFontMenu);
 
-	fSizeMenu = new BMenu("FontSize");
+	fSizeMenu = new BMenu(B_TRANSLATE("FontSize"));
 	fSizeMenu->SetRadioMode(true);
 	for (float size : kFontSizes) {
 		BMessage* message = new BMessage(kMsgSetFontSize);
 		message->AddFloat("size", size);
 		BString label;
-		label << (int)size << " point";
+		label.SetToFormat(B_TRANSLATE("%d point"), (int)size);
 		BMenuItem* item = new BMenuItem(label.String(), message);
 		item->SetMarked(size == fTextStyle.size);
 		fSizeMenu->AddItem(item);
@@ -574,18 +631,21 @@ MainWindow::_AddTextMenus(BMenuBar* menuBar)
 
 	// Style: MacPaint's shortcuts, except Outline and Shadow, whose O and S
 	// are Open and Save on Haiku.
-	BMenu* styleMenu = new BMenu("Style");
+	BMenu* styleMenu = new BMenu(B_TRANSLATE("Style"));
 	const struct {
 		const char*	label;
 		char		shortcut;
 	} faces[] = {
-		{"Plain", 'P'}, {"Bold", 'B'}, {"Italic", 'I'}, {"Underline", 'U'},
-		{"Outline", 0}, {"Shadow", 0}
+		{B_TRANSLATE_MARK("Plain"), 'P'}, {B_TRANSLATE_MARK("Bold"), 'B'},
+		{B_TRANSLATE_MARK("Italic"), 'I'},
+		{B_TRANSLATE_MARK("Underline"), 'U'},
+		{B_TRANSLATE_MARK("Outline"), 0}, {B_TRANSLATE_MARK("Shadow"), 0}
 	};
 	for (int i = 0; i < 6; i++) {
 		BMessage* message = new BMessage(kMsgSetTextFace);
 		message->AddInt32("face", i);
-		fFaceItems[i] = new BMenuItem(faces[i].label, message,
+		fFaceItems[i] = new BMenuItem(B_TRANSLATE_NOCOLLECT(faces[i].label),
+			message,
 			faces[i].shortcut);
 		styleMenu->AddItem(fFaceItems[i]);
 	}
@@ -594,12 +654,15 @@ MainWindow::_AddTextMenus(BMenuBar* menuBar)
 		const char*	label;
 		char		shortcut;
 	} alignments[] = {
-		{"Align left", 'L'}, {"Align middle", 'M'}, {"Align right", 'R'}
+		{B_TRANSLATE_MARK("Align left"), 'L'},
+		{B_TRANSLATE_MARK("Align middle"), 'M'},
+		{B_TRANSLATE_MARK("Align right"), 'R'}
 	};
 	for (int i = 0; i < 3; i++) {
 		BMessage* message = new BMessage(kMsgSetAlignment);
 		message->AddInt32("alignment", i);
-		fAlignItems[i] = new BMenuItem(alignments[i].label, message,
+		fAlignItems[i] = new BMenuItem(
+			B_TRANSLATE_NOCOLLECT(alignments[i].label), message,
 			alignments[i].shortcut);
 		styleMenu->AddItem(fAlignItems[i]);
 	}
@@ -635,9 +698,11 @@ MainWindow::_ConfirmDiscard(PendingAction action, const entry_ref* ref)
 		return true;
 
 	BString text;
-	text.SetToFormat("Save changes to the document \"%s\"?", fName.String());
-	BAlert* alert = new BAlert("Unsaved changes", text.String(), "Cancel",
-		"Don't save", "Save", B_WIDTH_AS_USUAL, B_OFFSET_SPACING,
+	text.SetToFormat(B_TRANSLATE("Save changes to the document \"%s\"?"),
+		fName.String());
+	BAlert* alert = new BAlert(B_TRANSLATE("Unsaved changes"), text.String(),
+		B_TRANSLATE("Cancel"), B_TRANSLATE("Don't save"), B_TRANSLATE("Save"),
+		B_WIDTH_AS_USUAL, B_OFFSET_SPACING,
 		B_WARNING_ALERT);
 	alert->SetShortcut(0, B_ESCAPE);
 	switch (alert->Go()) {
@@ -687,7 +752,7 @@ MainWindow::_New()
 	fCanvasView->SetImage(hp::Canvas());
 	_SetPatterns(hp::kPatterns);
 	fHasRef = false;
-	_SetDocumentName(kUntitled);
+	_SetDocumentName(B_TRANSLATE("untitled"));
 }
 
 
@@ -799,7 +864,8 @@ MainWindow::_SetDocumentName(const char* name)
 void
 MainWindow::_ShowError(const BString& text)
 {
-	BAlert* alert = new BAlert("Error", text.String(), "OK", NULL, NULL,
+	BAlert* alert = new BAlert(B_TRANSLATE("Error"), text.String(),
+		B_TRANSLATE("OK"), NULL, NULL,
 		B_WIDTH_AS_USUAL, B_STOP_ALERT);
 	alert->Go(NULL);
 }

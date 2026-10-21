@@ -1,0 +1,80 @@
+1	English	application/x-vnd.HaikuPaint	3065080682
+Unsaved changes	MainWindow		Unsaved changes
+The MacPaint document is damaged or incomplete.	DocumentIO		The MacPaint document is damaged or incomplete.
+Font	MainWindow		Font
+Couldn't open the file: %s	DocumentIO		Couldn't open the file: %s
+The canvas isn't MacPaint's size.	DocumentIO		The canvas isn't MacPaint's size.
+Style	MainWindow		Style
+OK	MainWindow		OK
+MacPaint document	DocumentIO		MacPaint document
+FontSize	MainWindow		FontSize
+Grid	MainWindow		Grid
+Quit	MainWindow		Quit
+HaikuPaint: Print catalog	MainWindow		HaikuPaint: Print catalog
+OK	Dialogs		OK
+Revert	MainWindow		Revert
+New	MainWindow		New
+Brush mirrors…	MainWindow		Brush mirrors…
+None	Dialogs		None
+Rotate	MainWindow		Rotate
+Print catalog…	MainWindow		Print catalog…
+There are no MacPaint documents in this folder.	MainWindow		There are no MacPaint documents in this folder.
+Print…	MainWindow		Print…
+Show page	MainWindow		Show page
+Cancel	MainWindow		Cancel
+Edit	MainWindow		Edit
+Save	MainWindow		Save
+File	MainWindow		File
+Flip vertical	MainWindow		Flip vertical
+Error	MainWindow		Error
+Save as…	MainWindow		Save as…
+Cancel	Dialogs		Cancel
+Show page	Dialogs		Show page
+Underline	MainWindow		Underline
+Don't save	MainWindow		Don't save
+Revert to the last version saved?	MainWindow		Revert to the last version saved?
+Flip horizontal	MainWindow		Flip horizontal
+Clear	MainWindow		Clear
+HaikuPaint can't read this kind of file.	DocumentIO		HaikuPaint can't read this kind of file.
+Fill	MainWindow		Fill
+FatBits	MainWindow		FatBits
+The file is too short to be a MacPaint document.	DocumentIO		The file is too short to be a MacPaint document.
+Couldn't save the document: %s	DocumentIO		Couldn't save the document: %s
+Undo	MainWindow		Undo
+Export as PNG…	MainWindow		Export as PNG…
+Align right	MainWindow		Align right
+untitled	MainWindow		untitled
+Align middle	MainWindow		Align middle
+Align left	MainWindow		Align left
+HaikuPaint version 2.0	Dialogs		HaikuPaint version 2.0
+About HaikuPaint	Dialogs		About HaikuPaint
+Edit pattern…	MainWindow		Edit pattern…
+Page setup…	MainWindow		Page setup…
+MacPaint image	DocumentIO		MacPaint image
+About HaikuPaint…	MainWindow		About HaikuPaint…
+MacPaint copyright 1983, Apple Computer Inc.	Dialogs		MacPaint copyright 1983, Apple Computer Inc.
+%d point	MainWindow		%d point
+Shadow	MainWindow		Shadow
+HaikuPaint: Export as PNG	MainWindow		HaikuPaint: Export as PNG
+Invert	MainWindow		Invert
+Bold	MainWindow		Bold
+Paste	MainWindow		Paste
+Cut	MainWindow		Cut
+Edit pattern	Dialogs		Edit pattern
+MacPaint documents in %s	MainWindow		MacPaint documents in %s
+This doesn't look like a MacPaint document.	DocumentIO		This doesn't look like a MacPaint document.
+Outline	MainWindow		Outline
+Brush shape…	MainWindow		Brush shape…
+Save changes to the document \"%s\"?	MainWindow		Save changes to the document \"%s\"?
+Italic	MainWindow		Italic
+Couldn't export the image: %s	DocumentIO		Couldn't export the image: %s
+Trace edges	MainWindow		Trace edges
+Brush mirrors	Dialogs		Brush mirrors
+Select all	MainWindow		Select all
+after MacPaint, written by Bill Atkinson	Dialogs		after MacPaint, written by Bill Atkinson
+Brush shape	BrushWindow		Brush shape
+Print	MainWindow		Print
+Plain	MainWindow		Plain
+Goodies	MainWindow		Goodies
+Open…	MainWindow		Open…
+Copy	MainWindow		Copy
