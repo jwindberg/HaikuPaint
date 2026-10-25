@@ -8,7 +8,7 @@ cd "$(dirname "$0")/.."
 make
 make bindcatalogs
 
-VERSION=2.0.0
+VERSION=2.0.1
 REVISION=1
 ARCH=$(getarch)
 STAGE=package-stage
@@ -30,7 +30,7 @@ summary			"A re-creation of MacPaint for Haiku"
 description		"HaikuPaint is the 1984 MacPaint, rebuilt as a native Haiku \
 application: every tool, MacPaint's original patterns, icons and cursors, \
 FatBits, the Goodies, and real MacPaint documents."
-packager		"jwindberg <john@windberg.name>"
+packager		"jwindberg <jwindberg@gmail.com>"
 vendor			"jwindberg"
 licenses		{ "MIT" }
 copyrights		{

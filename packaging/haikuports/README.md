@@ -1,7 +1,7 @@
 # HaikuPorts recipe
 
-`haiku-apps/haikupaint/haikupaint-2.0.0.recipe` builds HaikuPaint from the
-`v2.0.0` GitHub release tarball; its checksum is filled in. To submit it,
+`haiku-apps/haikupaint/haikupaint-2.0.1.recipe` builds HaikuPaint from the
+`v2.0.1` GitHub release tarball. To submit it,
 copy the `haiku-apps/haikupaint` folder into a fork of
    https://github.com/haikuports/haikuports, test it with
    `haikuporter --build haikupaint`, and open a pull request.
